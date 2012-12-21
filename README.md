@@ -1,4 +1,4 @@
 jupiter
 =======
 
-An linux systray-applet which helps with powersaving, device- and display-management.
+An linux applet which helps with powersaving, device- and display-management and comes with an AppIndicator.
