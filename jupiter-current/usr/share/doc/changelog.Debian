@@ -1,0 +1,37 @@
+jupiter (0.1.11-1) precise; urgeny=low
+
+  * merged last changes from jupiter svn
+  * new maintainer and home on github
+
+ -- Jochen Schulz <schulz@math.uni-goettingen.de> Thu, 21 Dec 2012 17:05:58 +0100
+
+jupiter (0.1.7-4) precise; urgeny=low
+ 
+  * enforced directory-permissions of /var/jupiter correctly
+  * changed device-detection to be more versatile
+  * added switch to disable monitor-management
+
+ -- Jochen Schulz <schulz@math.uni-goettingen.de> Thu, 13 Dec 2012 18:00:28 +0100
+
+jupiter (0.1.7-3) precise; urgeny=low
+ 
+  * fixed bug in code for the primary-functionality
+
+ -- Jochen Schulz <schulz@math.uni-goettingen.de> Thu, 09 Nov 2012 18:45:28 +0100
+
+jupiter (0.1.7-1) precise; urgeny=low
+
+  * fixed broken primary-switching support
+  * added some functions and includes in the scripts to be more organized
+  * added support for --above and --below from xrandr
+  * disconnecting an external monitor now switches to internal display only
+
+ -- Jochen Schulz <schulz@math.uni-goettingen.de> Thu, 04 Oct 2012 18:45:28 +0100
+
+jupiter (0.1.2-1~webupd8-1) precise; urgency=medium
+ 
+  * jupiter now uses python instead of mono
+  * fix touchpad enable/disable for GlidePoint
+  * other fixes
+ 
+ -- Alin Andrei <webupd8@gmail.com>  Tue, 13 Mar 2012 01:02:38 +0100

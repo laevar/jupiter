@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Jupiter
+Comment=Desktop Management Applet
+Icon=/usr/share/pixmaps/jupiter.png
+Exec=/usr/bin/jupiter
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;System;

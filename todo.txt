@@ -1,0 +1,4 @@
+-initial display-settings when 2 screens are connected are sometimes somehow screwed up (they overlap)
+-saving settings regarding different monitors, not displays. 
+-reorganize repo after uploading to github
+-clean up code and remove  obsolete functionality
