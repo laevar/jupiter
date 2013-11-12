@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# Touchpad toggle
+# Andrew Wyatt
+# Tool to enable / disable touchpad
+#
+
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+JUPITER_VAR="/var/jupiter"
+
+if [[ "$*" =~ "silent" ]]; then
+  NO_NOTIFY=1
+fi
+
+. $JUPITER_PATH/notify
+
+NICON="/usr/share/pixmaps/input-tablet.png"
+
+if [ ! -d "$JUPITER_VAR" ]; then
+  mkdir $JUPITER_VAR
+fi
+
+if [ -e "$JUPITER_VAR/touchpad_saved" ]; then
+  TPSAVED=$(cat $JUPITER_VAR/touchpad_saved)
+fi
+
+function touchpad_xinput_device() {
+  XI_DEV=$(xinput list 2>/dev/null | grep -i -e Touchpad -e Click-Pad -e GlidePoint | sed -s -e "s#id=.*\$##g" -e "s#^\W\+##g" -e "s#\s\+\$##g" -e "s#\W\$##")
+  if [ "$XI_DEV" != "" ]; then
+    if xinput list-props "$XI_DEV" 2>/dev/null | grep -m 1 "Synaptics Off" >/dev/null; then
+      echo -n "$XI_DEV"
+    fi
+  fi
+}
+
+TOUCHPAD_XI_DEV=$(touchpad_xinput_device)
+
+function touchpad_status {
+  TPSTATE=$(touchpad_state)
+  if [ "$TPSTATE" = "" ]; then
+    TPSTATE=2
+  fi
+  if [ "$TPSTATE" = 1 ]; then
+    echo "ON"
+  elif [ "$TPSTATE" = "2" ]; then
+    echo "UNKNOWN"
+  else
+    echo "OFF"
+  fi
+}
+
+function touchpad_state {
+  xinput list-props "$TOUCHPAD_XI_DEV" 2>/dev/null | awk '/Device Enabled/ {printf $4}'
+  if [ ! "$?" = "0" ]; then
+    echo 2
+  fi
+}
+
+function touchpad_set_state {
+    xinput set-int-prop "$TOUCHPAD_XI_DEV" 'Device Enabled' 8 $1 2>/dev/null
+}
+
+function touchpad_toggle {
+  TOUCHPAD=$(touchpad_state)
+  if [ "$TOUCHPAD" = "1" ]; then
+    touchpad_set_state 0
+    echo 0 > $JUPITER_VAR/touchpad_saved
+    if [ $? = "0" ]; then
+      notify $"Touchpad Disabled" $NICON
+    else
+      notify $"Unable to disable touchpad." $NICON
+    fi
+  else
+    touchpad_set_state 1
+    echo 1 > $JUPITER_VAR/touchpad_saved
+    if [ $? = "0" ]; then
+      notify $"Touchpad Enabled" $NICON
+    else
+      notify $"Unable to enable touchpad" $NICON
+    fi
+  fi
+}
+
+function touchpad_restore {
+  if [ "$TPSAVED" = "0" ]; then
+    touchpad_set_state 0
+  else
+    touchpad_set_state 1
+  fi
+}
+
+case $1 in
+  restore)
+    touchpad_restore
+  ;;
+  status)
+    touchpad_status
+  ;;
+  *)
+    touchpad_toggle
+  ;;
+esac

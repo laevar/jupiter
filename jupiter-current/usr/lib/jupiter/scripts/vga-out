@@ -1,0 +1,182 @@
+#!/bin/bash
+#
+# $SECOND_DEVICE toggle
+# Andrew Wyatt
+# Tool to enable / disable $SECOND_DEVICE output
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+NICON="/usr/share/pixmaps/display.png"
+
+. $JUPITER_PATH/common
+
+if [ -e "$JUPITER_VAR/vga_saved" ]; then
+  VGA_RESTORE=$(cat $JUPITER_VAR/vga_saved)
+fi
+
+# check if DISPLAY is set, and if not, get Xauth
+if [ x"$DISPLAY" = x"" ]; then
+  for x in /tmp/.X11-unix/*; do 
+    displaynum=$(echo $x | sed s#/tmp/.X11-unix/X##)
+    getXuser
+    if [ x"$XAUTHORITY" != x"" ]; then
+      export DISPLAY=":$displaynum"
+    fi
+  done
+fi
+
+. $JUPITER_PATH/devices
+
+function video_toggle {
+  if [ "$VGA_RESTORE" = "lvds" ]; then
+    vga
+  elif [ "$VGA_RESTORE" = "vga" ]; then
+    clone
+  else
+    lvds
+  fi
+}
+
+function mon {
+  echo -n $FIRST_DEVICE > $JUPITER_VAR/displays
+  if [ x"$SECOND_DEVICE" != x"" ]; then
+      #TODO: try to switch to last saved state
+      if [ -s $JUPITER_VAR/displays ]; then 
+	 echo -n " " >> $JUPITER_VAR/displays
+      fi
+      echo -n $SECOND_DEVICE >> $JUPITER_VAR/displays
+  else
+      lvds
+  fi
+  exit 0 
+}
+
+function vga {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --off
+    notify $"External Display Mode" $NICON
+    echo vga > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+function clone {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto --same-as $FIRST_DEVICE  
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --auto
+    notify $"Clone Display Mode" $NICON
+    echo clone > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+#internal left
+function il {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto --right-of $FIRST_DEVICE --primary
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --auto
+    notify $"Internal Display Left" $NICON
+    echo il > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+#internal right
+function ir {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto --left-of $FIRST_DEVICE --primary
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --auto
+    notify $"Internal Display right" $NICON
+    echo ir > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+#internal bottom
+function ib {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto --above $FIRST_DEVICE --primary
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --auto
+    notify $"Internal Display at bottom" $NICON
+    echo ib > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+#internal top
+function it {
+  check_external
+  xrandr --output $SECOND_DEVICE --auto --below $FIRST_DEVICE --primary
+  if [ "$?" = "0" ]; then
+    xrandr --output $FIRST_DEVICE --auto
+    notify $"Internal Display at top" $NICON
+    echo it > $JUPITER_VAR/vga_saved
+  else
+    notify $"Could not enable monitor." $NICON
+  fi
+}
+
+
+function lvds {
+  xrandr --output $FIRST_DEVICE --auto
+  if [ "$?" = "0" ]; then
+    xrandr --output $SECOND_DEVICE --off
+    notify $"Internal Display Mode" $NICON
+    echo lvds > $JUPITER_VAR/vga_saved
+  else
+    notify "Could not enable monitor." $NICON
+  fi
+}
+
+function dont {
+  notify $"Displays not managed" $NICON
+  echo dont > $JUPITER_VAR/vga_saved
+}
+
+case $1 in
+  restore)
+    NO_NOTIFY=1
+    $VGA_RESTORE
+  ;;
+  clone)
+    clone
+  ;;
+  il)
+    il
+  ;;
+  ir)
+    ir
+  ;;
+  ib)
+    ib
+  ;;
+  it)
+    it
+  ;;
+  vga)
+    vga
+  ;;
+  lvds)
+    lvds
+  ;;
+  dont)
+    dont
+  ;;
+  mon)
+    mon
+  ;;
+  *)
+    video_toggle
+  ;;
+esac
+$JUPITER_PATH/resolutions modes $SECOND_DEVICE
+$JUPITER_PATH/resolutions modes $FIRST_DEVICE

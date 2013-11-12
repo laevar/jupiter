@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+#  Bluetooth Toggle
+#  by Andrew Wyatt
+#  Generic BT toggle utility
+#
+
+JUPITER_VAR="/var/jupiter"
+BT_STATE=$(rfkill list bluetooth 2>/dev/null | grep Soft 2>/dev/null | awk '{print $3}' | head -n 1 )
+
+if [[ "$*" =~ "silent" ]]; then
+  NO_NOTIFY=1
+fi
+
+. /usr/lib/jupiter/scripts/notify
+
+NICON="/usr/share/pixmaps/bluetooth.png"
+
+if [ -e $JUPITER_VAR/bt_saved ]; then
+  RADIO_SAVED_STATE=$(cat $JUPITER_VAR/bt_saved)
+else
+  RADIO_SAVED_STATE=0
+fi
+
+if [ ! -d "$JUPITER_VAR" ]; then
+  mkdir $JUPITER_VAR 2>/dev/null
+fi
+
+function bt_status {
+  if $(echo "$BT_STATE" | grep -q yes 2>/dev/null); then
+    echo "OFF"
+  elif $(echo "$BT_STATE" | grep -q no 2>/dev/null); then
+    echo "ON"
+  else
+    echo "UNKNOWN"
+    exit 0
+  fi
+}
+
+function radio_on {
+  rfkill unblock bluetooth >/dev/null 2>&1
+  echo 1 > $JUPITER_VAR/bt_saved
+  notify $"Bluetooth Radio on" $NICON
+}
+
+function radio_off {
+  rfkill block bluetooth >/dev/null 2>&1
+  echo 0 > $JUPITER_VAR/bt_saved
+  notify $"Bluetooth Radio off" $NICON
+}
+
+function radio_poweroff {
+  rfkill block bluetooth >/dev/null 2>&1
+}
+
+function radio_toggle {
+  if [ "$BT_STATE" = "no" ]; then
+    radio_off
+  else
+    radio_on
+  fi
+}
+
+function radio_restore {
+  NO_NOTIFY=1
+  if [ "$RADIO_SAVED_STATE" = "1" ]; then
+    if [ "$RADIO_STATE" = "0" ]; then
+      radio_on
+    fi
+  else
+    if [ "$RADIO_STATE" = "1" ]; then
+      radio_off
+    fi
+  fi
+}
+
+case $1 in
+  restore)
+    radio_restore
+  ;;
+  status)
+    bt_status
+  ;;
+  on|enable)
+    radio_on
+  ;;
+  off|disable)
+    radio_off
+  ;;
+  poweroff)
+    radio_poweroff
+  ;;
+  *)
+    radio_toggle
+  ;;
+esac

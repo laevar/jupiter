@@ -1,0 +1,7 @@
+VGA_XRANDR=$(xrandr)
+FIRST_DEVICE=$(echo "$VGA_XRANDR" | grep " connected" | awk '{print $1}' | head -1)
+SECOND_DEVICE=$(echo "$VGA_XRANDR" | grep " connected" | awk '{print $1}' | grep -v $FIRST_DEVICE | head -1 )
+FIRST_ENABLED=$(echo "$VGA_XRANDR" | grep "$FIRST_DEVICE connected" -A 1 | grep "\*" >/dev/null 2>&1 && echo 1)
+SECOND_ENABLED=$(echo "$VGA_XRANDR" | grep "$SECOND_DEVICE connected" -A 1 | grep "\*" >/dev/null 2>&1 && echo 1)
+#EXTERNALS=$(echo "$VGA_XRANDR" |  awk '{print $1}' | grep -e "^VGA\|^DVI\|^DP\|^HDMI")
+

@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# $VIDEO_DEVICE resolution toggle
+# Andrew Wyatt
+# Tool to toggle $VIDEO_DEVICE output resolutions
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+NICON="/usr/share/pixmaps/resolution.png"
+. $JUPITER_PATH/common
+. $JUPITER_PATH/devices
+
+if [ ! "$2" ]; then
+  VDEV=$FIRST_DEVICE
+else
+  VDEV="$2"
+fi
+VIDEO_DEVICE=$(xrandr | grep " connected" | awk '{print $1}' | grep $VDEV)
+
+VIDEO_DEFAULT=$(xrandr | grep -F -e $VIDEO_DEVICE -A 12 | grep [0-9]x[0-9] | grep -v -e $VIDEO_DEVICE | head -n 1 | awk '{printf $1" "}')
+VIDEO_MODES=$(xrandr | grep -F -e $VIDEO_DEVICE -A 12 | grep [0-9]x[0-9] | grep -v -e $VIDEO_DEVICE | awk '{printf $1" "}')
+  if [[ "$VIDEO_MODES" =~ "1024x600" ]]; then
+    VIDEO_MODES="1024x768 $VIDEO_MODES"
+  elif [[ "$VIDEO_MODES" =~ "800x480" ]]; then
+    VIDEO_MODES="800x600 $VIDEO_MODES"
+  fi
+
+VIDEO_CURRENT=$(xrandr | grep -F -e $VIDEO_DEVICE | awk '{print $3}' | sed -e "s#\+.*##")
+NEW_RESOLUTION=$1;
+
+function save_modes {
+    SAVE_VIDEO_MODES=$(xrandr | grep -F -e $VIDEO_DEVICE -A 12 | grep [0-9]x[0-9] | grep -v -e $VIDEO_DEVICE | awk '{printf $1" "}')
+    SAVE_VIDEO_CURRENT=$(xrandr | grep -F -e $VIDEO_DEVICE | awk '{print $3}' | sed -e "s#\+.*##")
+    if [[ "$SAVE_VIDEO_MODES" =~ "1024x600" ]]; then
+      SAVE_VIDEO_MODES="1024x768 $SAVE_VIDEO_MODES"
+    elif [[ "$SAVE_VIDEO_MODES" =~ "800x480" ]]; then
+      SAVE_VIDEO_MODES="800x600 $SAVE_VIDEO_MODES"
+    fi
+    echo -n "$SAVE_VIDEO_CURRENT $SAVE_VIDEO_MODES" > $JUPITER_VAR/available_resolutions_$VIDEO_DEVICE
+}
+
+function toggle_resolution {
+  for MODE in $VIDEO_MODES $VIDEO_MODES; do
+    if [ "$MODE" = "$VIDEO_CURRENT" ]; then
+      NEXT=1;
+    elif [ "$NEXT" = "1" ]; then
+      if [ "$MODE" = "1024x768" ]; then
+        if [[ "$VIDEO_MODES" =~ "1024x600" ]]; then
+          CHMODE="1024x600"
+          SCALE="1.00x1.28"
+        fi
+      elif [ "$MODE" = "800x600" ]; then
+        if [[ "$VIDEO_MODES" =~ "800x480" ]]; then
+          CHMODE="800x480"
+          SCALE="1.00x1.25"
+        fi
+      fi
+      if [ "$CHMODE" = "" ]; then
+        CHMODE=$MODE
+        SCALE="1.00x1.00"
+      fi
+      xrandr --output $VIDEO_DEVICE --mode $CHMODE --scale $SCALE
+      notify $"New Resolution: \"$MODE\"" $NICON
+
+      echo $MODE > $JUPITER_VAR/resolution_saved_$VIDEO_DEVICE
+      save_modes
+      exit
+    fi
+  done
+  exit
+}
+
+function set_resolution {
+  if [ "$1" = "" ]; then
+    toggle_resolution
+    exit
+  fi
+  MODE=$1
+  if [ "$MODE" = "1024x768" ]; then
+    if [[ "$VIDEO_MODES" =~ "1024x600" ]]; then
+      CHMODE="1024x600"
+      SCALE="1.00x1.28"
+    fi
+  elif [ "$MODE" = "800x600" ]; then
+    if [[ "$VIDEO_MODES" =~ "800x480" ]]; then
+      CHMODE="800x480"
+      SCALE="1.00x1.25"
+    fi
+  fi
+  if [ "$CHMODE" = "" ]; then
+    CHMODE=$MODE
+    SCALE="1.00x1.00"
+  fi
+
+  xrandr --output $VIDEO_DEVICE --mode $CHMODE --scale $SCALE
+  if [ ! "$MODE" = "silent" ]; then
+    notify $"New Resolution: \"$MODE\"" $NICON
+  fi
+  echo $MODE > $JUPITER_VAR/resolution_saved_$VIDEO_DEVICE
+  save_modes
+  exit
+}
+
+function restore_resolution {
+  if [ -e "$JUPITER_VAR/resolution_saved_$VIDEO_DEVICE" ]; then
+    MODE=$(cat $JUPITER_VAR/resolution_saved_$VIDEO_DEVICE)
+    if [ ! "$MODE" = "$VIDEO_CURRENT" ]; then
+      if [ "$MODE" = "1024x768" ]; then
+        if [[ "$VIDEO_MODES" =~ "1024x600" ]]; then
+          CHMODE="1024x600"
+          SCALE="1.00x1.28"
+        fi
+      elif [ "$MODE" = "800x600" ]; then
+        if [[ "$VIDEO_MODES" =~ "800x480" ]]; then
+          CHMODE="800x480"
+          SCALE="1.00x1.25"
+        fi
+      fi
+      if [ "$CHMODE" = "" ]; then
+        CHMODE=$MODE
+        SCALE="1.00x1.00"
+      fi
+      xrandr --output $VIDEO_DEVICE --mode $CHMODE --scale $SCALE
+    fi
+  fi
+  save_modes
+  exit
+}
+
+case $1 in
+  restore)
+    restore_resolution
+  ;;
+  toggle)
+    $JUPITER_PATH/rotate default $VIDEO_DEVICE
+    toggle_resolution
+  ;;
+  modes)
+    save_modes
+  ;;
+  default)
+    set_resolution $VIDEO_DEFAULT silent 
+  ;;
+  *)
+    $JUPITER_PATH/rotate default $VIDEO_DEVICE
+    set_resolution $NEW_RESOLUTION
+  ;;
+esac

@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Simple script to alter kernel parameters for CPUMODE.d
+# Andrew Wyatt
+#
+# Sysctl script for altering parameters when shifting to [powersave] mode.
+#
+# Add any custom kernel parameters here.
+#
+
+echo 5 > /proc/sys/vm/laptop_mode
+echo 1500 > /proc/sys/vm/dirty_writeback_centisecs
+echo 1 > /sys/module/snd_hda_intel/parameters/power_save
+
+echo 1 > /sys/devices/system/cpu/sched_mc_power_savings
+echo 0 > /proc/sys/kernel/nmi_watchdog
+echo 1 > /sys/devices/system/cpu/sched_smt_power_savings
+
+### OSS Radeon Driver power management
+echo low > /sys/class/drm/card0/device/power_profile
+
+### Automatic device power management management
+for fdevice in /sys/bus/{pci,spi,i2c}/devices/*/power/control; do
+  echo auto > $fdevice
+done
+
+for sdevice in /sys/class/scsi_host/host*/link_power_management_policy; do
+  echo min_power > $sdevice
+done
+
+for usb in /sys/bus/usb/devices/*/power/autosuspend; do
+  echo 1 > $usb;
+done
+
+### WIFI power management
+WIFI_ADAPTER=$(find /sys/class/net/*/ | grep wireless | head -n 1 | sed -s -e "s#^/sys.*net/##" -e "s#/wireless.*\$##")
+iw dev $WIFI_ADAPTER set power_save on

@@ -1,0 +1,611 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+#  Jupiter
+#  
+#  Copyright 2012 Jorge Luis Betancourt <betancourt.jorge@gmail.com> and Andrew Wyatt
+#  Copyright 2007-2011 Andrew Wyatt
+#
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+#  
+#  
+
+import pygtk
+pygtk.require('2.0')
+import gtk, gobject
+import subprocess
+import re
+import string
+import threading
+
+try:
+    import appindicator
+    loaded_indicator = True
+except ImportError, ex:
+    loaded_indicator = False
+
+APP_TITLE = 'Jupiter'
+APP_DESCRIPTION = 'Generic interface for display, power, and device control.'
+APP_COPYRIGHT = 'Copyright 2009-2012 Andrew Wyatt (Fewt)\n and Jorge Luis Betancourt'
+APP_VERSION = '0.1.11'
+PATH = "/usr/lib/jupiter/scripts"
+VENDOR_PATH = "/usr/lib/jupiter/vendors"
+VAR_PATH = "/var/jupiter"
+
+class Jupiter:
+    """ Class to handle all possible configurations for the devices """
+    
+    def __init__ (self, path, vendors, var):
+        self.path = path
+        self.vendors = vendors
+        self.var = var
+        self.temp = '/sys/devices/virtual/hwmon/hwmon0/temp1_input'
+        self.cpu_freq = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+        self.bluetooth = self.check_state('/bluetooth')
+        self.wifi = self.check_state('/wifi')
+        self.touchpad = self.check_state('/touchpad')
+        self.vendor = self.get_vendor()
+        self.video_modes = False
+        self.displays = []
+        self.performance_modes = {
+            'super' : 'Maximum Performance',
+            'high'  : 'Power On Demand',
+            'powersave' : 'Power Savings '
+        }
+    
+    def get_output(self, command, args=None, msg=None, sudo=False):
+        """ Execute a command and returns the standard output, deleting
+        all new line characters """
+        try:
+            cmd = []
+            if sudo: 
+                cmd = ['sudo']
+            if type(args) == type([]):
+                cmd += [self.path + command] + args
+            else:
+                cmd += [self.path + command, args]
+            # data = subprocess.check_output(cmd, shell=False, stderr=fh).replace('\n','')
+            # FIX for python 2.6, backward compatibility
+            return subprocess.Popen(cmd, shell=False, stderr=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].replace('\n','')
+        except Exception, ex:
+            if msg != None:
+                print msg + ex
+        return False
+    
+    def check_state(self, cmd):
+        """ Check the status of the device passed as cmd """
+        return self.get_output(cmd, 'status')
+
+    def get_vendor(self):
+        """ Get the CPU vendor model of the computer """
+        return self.get_output('/cpu-control', 'vendor', 'Unable to get vendor information for this system', True)
+        
+    def get_video_modes(self):
+        """ Detect the available video modes (resolutions) """
+        self.video_modes = True
+        cmd = ['sudo', self.path + '/resolutions', 'modes']
+        try:
+            subprocess.Popen(cmd, shell=False).wait()
+            return True
+        except Exception, ex:
+            print 'Unable to capture available video modes + ' + ex
+        cmd = ['sudo', self.path + '/resolutions', 'modes','VGA1']
+        try:
+            subprocess.Popen(cmd, shell=False).wait()
+            return True
+        except Exception, ex:
+            print 'Unable to capture available video modes + ' + ex
+        return False
+
+    def exec_command(self, cmd, args):
+        """ Execute custom command and returns the standard output
+        customizing the error message """
+        return self.get_output('/' + cmd, args, 'Unable to execute command: ' + cmd + ' with arguments ' + str(args), True)
+    
+    def switch_state(self, state):
+        """ Switch throw state, return True or False according to the
+        activation status [ON|OFF] of the device """
+        if state == 'OFF' or state == '0':
+            return False
+        elif state == 'ON' or state == '1':
+            return True
+        else:
+            return None
+    
+    def collect_data(self, args):
+        """ Read the content of the file, replacing all new line characters
+        and returns the content """
+        try:
+            f = open(args, 'r')
+            return f.read().replace('\n', '')
+        except Exception:
+            pass
+        return False
+    
+    def match_active_device(self, fname, expr, command=None, args=None):
+        data = self.collect_data(self.var + fname)
+        if data == False:
+            self.exec_command(command, args)
+            return True
+        if re.match(expr, data):
+            return True
+        return False
+    
+    def get_device(self, fname, cmd=None, args=None):
+        data = self.collect_data(self.var + fname)
+        if data == False:
+            self.exec_command(cmd, args)
+            data = self.collect_data(self.var + fname)
+        return data
+
+    def is_cpu_mode(self, args=''):
+        return self.match_active_device('/cpu_mode', args, 'cpu-control', 'initial')
+    
+    def get_current_cpu_mode(self):
+        return self.get_device('/cpu_mode', 'cpu-control', 'initial')
+    
+    def get_cpu_mode_name(self):
+        return self.performance_modes[self.get_device('/cpu_mode', 'cpu-control', 'initial')]
+    
+    def current_rotation(self,args):
+        return self.get_device('/rotation_saved_'+args, 'rotate', ['normal',args]).split(' ')[0]
+    
+    def current_primary(self):
+        return self.get_device('/primary_saved', 'primary', 'default')
+
+    def is_current_rotation(self, args,display):
+        return self.match_active_device('/rotation_saved_'+display, args, 'rotate', ['normal ',display])
+
+    def current_display(self):
+        return self.get_device('/vga_saved', 'vga-out', 'clone')
+
+    def is_current_display(self, args):
+        return self.match_active_device('/vga_saved', args, 'vga-out', 'clone')
+
+    def get_displays(self):
+	    return self.get_device('/displays','vga-out','mon').split(' ')
+
+    def get_available_resolutions(self, args):
+        return self.get_device('/available_resolutions_' + args,'resolutions','modes ' + args).split(' ')
+    
+    def get_temperature(self):
+        temp = int(self.collect_data(self.temp))
+        temp = temp / 1000
+        return str(temp) + ' ºC'
+
+class JupiterIndicator:
+    """ Class to handle the Indicator, indicator menu and GUI """
+    def __init__(self):
+        if loaded_indicator:
+            self.ind = appindicator.Indicator ("jupiter-client", "indicator-messages", appindicator.CATEGORY_APPLICATION_STATUS)
+            self.ind.set_status (appindicator.STATUS_ACTIVE)
+            self.ind.set_attention_icon ("indicator-messages-new")
+            self.ind.set_icon('bolt2')
+        else:
+            # ['JavaEmbeddedFrame', 'Wine', 'scp-dbus-service', 'Update-notifier', 'Jupiter']
+            # gsettings set com.canonical.Unity.Panel systray-whitelist "['all']"
+            self.tray = gtk.StatusIcon()
+            self.tray.set_from_icon_name('bolt2')
+            self.tray.set_visible(True)
+        
+        self.jupiter = Jupiter(PATH, VENDOR_PATH, VAR_PATH)
+       
+	    # update icon     
+        self.update_icon()
+        
+        # create the principal menu
+        self.menu = gtk.Menu()
+        performances = gtk.Menu()
+        devices = gtk.Menu()
+        resolutions = gtk.Menu()
+        orientations = gtk.Menu()
+        primary = gtk.Menu()
+        displays = gtk.Menu()
+
+        # create menu items for the menus, about and exit
+        perf_item = gtk.MenuItem('Performance')
+        dev_item = gtk.MenuItem('Devices')
+        res_item = gtk.MenuItem('Screen Resolutions')
+        ort_item = gtk.MenuItem('Screen Orientation')
+        prim_item = gtk.MenuItem('Primary Display')
+        disp_item = gtk.MenuItem('Video Displays')
+        
+        # link the menu item with the corresponding submenu
+        perf_item.set_submenu(performances)
+        perf_item.show()
+        dev_item.set_submenu(devices)
+        dev_item.show()
+        res_item.set_submenu(resolutions)
+        res_item.show()
+        ort_item.set_submenu(orientations)
+        ort_item.show()
+        prim_item.set_submenu(primary)
+        prim_item.show()
+        disp_item.set_submenu(displays)
+        disp_item.show()
+
+
+        # Create and visualize a separator
+        seps = []
+        for i in range(0,4):
+            sep = gtk.SeparatorMenuItem()
+            sep.show()
+            seps.append(sep)
+        
+        # Add all the menu items
+        self.menu.append(seps[3])
+        self.menu.append(perf_item)
+        self.menu.append(seps[0])
+        self.menu.append(dev_item)
+        self.menu.append(seps[1])
+        self.menu.append(res_item)
+        self.menu.append(ort_item)
+        self.menu.append(prim_item)
+        self.menu.append(disp_item)
+        self.menu.append(seps[2])
+
+    	# Get external monitor, if any (assume there is only one)        
+        self.jupiter.displays = self.jupiter.get_displays()
+
+        # Menu Info
+        threading.Thread(target=self.update_menu_info, args=[]).start()
+        
+        # Performance Menu
+        threading.Thread(target=self.update_performance_menu, args=[performances]).start()
+        
+        # Devices menu
+        threading.Thread(target=self.update_devices_menu, args=[devices]).start()
+        
+        # Screen resolutions
+        threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
+        
+        # Screen orientations
+        threading.Thread(target=self.update_screen_orientations, args=[orientations]).start()
+        
+        # Primary Display
+        threading.Thread(target=self.update_primary, args=[primary]).start()
+       
+    	# Video Displays
+        threading.Thread(target=self.update_video_displays, args=[displays]).start()
+
+        image = gtk.MenuItem("About")
+        image.connect("activate", self.about_dialog)
+        image.show()
+        self.menu.append(image)
+
+        image = gtk.MenuItem("Quit")
+        image.connect("activate", self.quit)
+        image.show()
+        self.menu.append(image)
+                    
+        self.menu.show()
+        if loaded_indicator:
+            self.ind.set_menu(self.menu)
+        else:
+            self.tray.connect('popup-menu', self.right_click_event)
+            self.tray.connect('activate', self.left_click_event)
+            #self.tray.set_tooltip(APP_TITLE + ': ' + APP_DESCRIPTION)
+        
+        # Set the timer callback
+        gobject.timeout_add_seconds(1, self.elapsed_time)
+
+    def update_icon(self):                           
+        m = self.jupiter.get_current_cpu_mode()      
+                                                     
+        if m == 'high':                              
+            if loaded_indicator:                     
+                self.ind.set_icon('bolt1')           
+            else:                                    
+                self.tray.set_from_icon_name('bolt1')
+        elif m == 'powersave':                       
+            if loaded_indicator:                     
+                self.ind.set_icon('bolt4')           
+            else:                                    
+                self.tray.set_from_icon_name('bolt4')
+        else:                                        
+            if loaded_indicator:                     
+                self.ind.set_icon('bolt2')           
+            else:                                    
+                self.tray.set_from_icon_name('bolt2')
+    
+    def right_click_event(self, icon, button, time):
+        self.menu.popup(None, None, gtk.status_icon_position_menu, button, time, self.tray)
+    
+    def left_click_event(self, data):
+        self.menu.popup(None, None, gtk.status_icon_position_menu, 1, gtk.get_current_event_time(), self.tray)
+   
+    def update_screen_menus(self):
+	    # screen menu
+        self.menu.remove(self.menu.get_children()[6])
+        resolutions = gtk.Menu()
+        res_item = gtk.MenuItem('Screen Resolutions')
+        res_item.set_submenu(resolutions)
+        res_item.show()
+        self.menu.insert(res_item,6)
+        self.update_screen_resolutions(resolutions)
+	    # rotate menu
+        self.menu.remove(self.menu.get_children()[7])
+        orientations = gtk.Menu()
+        ort_item = gtk.MenuItem('Screen Orientation')
+        ort_item.set_submenu(orientations)
+        ort_item.show()
+        self.menu.insert(ort_item,7)
+    	self.update_screen_orientations(orientations)
+	    # primary menu
+    	self.menu.remove(self.menu.get_children()[8])
+        primary = gtk.Menu()
+        prim_item = gtk.MenuItem('Primary Display')
+        prim_item.set_submenu(primary)
+        prim_item.show()
+        self.menu.insert(prim_item,8)
+    	self.update_primary(primary)
+	    # video menu
+    	self.menu.remove(self.menu.get_children()[9])
+    	displays = gtk.Menu()
+        disp_item = gtk.MenuItem('Video Displays')
+        disp_item.set_submenu(displays)
+        disp_item.show()
+        self.menu.insert(disp_item,9)
+        threading.Thread(target=self.update_video_displays, args=[displays]).start()
+ 
+    def update_video_displays(self, displays):
+        videos = [ ['Internal only','lvds'], ['External only','vga'], ['Both: cloned ','clone'], ['Both: internal left','il'],  ['Both: internal right','ir'] , ['Both: internal top','it'] , ['Both: internal bottom','ib'], ['Don\'t manage Displays','dont']]
+        if (len(self.jupiter.displays) == 1): return
+        vgroup = gtk.RadioMenuItem()
+        mode = self.jupiter.current_display()
+        for name,tag in videos:
+            item = gtk.RadioMenuItem(vgroup, name)
+            if mode == tag:
+                item.set_active(True)
+            item.connect("toggled", self.change_video_display, tag)
+            item.show()
+            displays.append(item)
+    
+    def update_screen_orientations(self, orientations):
+        orient = { 'Normal' : 'normal', 'Left' : 'left', 'Right' : 'right', 'Upside Down' : 'inverted' }
+    	for display in self.jupiter.displays:
+    	    rotation = self.jupiter.current_rotation(display)
+        
+            oint = gtk.Menu()
+            oint_item = gtk.MenuItem(display)
+            oint_item.set_submenu(oint)
+    	    oint_item.show()
+            ogroup = gtk.RadioMenuItem()
+            for name in orient.keys():
+               item = gtk.RadioMenuItem(ogroup, name)
+               if rotation == orient[name]:
+                  item.set_active(True)
+               item.connect("toggled", self.change_orientation, orient[name],display)
+               item.show()
+               oint.append(item)
+            orientations.append(oint_item)
+	
+
+   
+    def update_primary(self, primary):
+    	primbut = gtk.RadioMenuItem()
+        for display in self.jupiter.displays:
+            if display == "":
+                continue
+            prim = self.jupiter.current_primary() 
+            item = gtk.RadioMenuItem(primbut, display)
+            if prim == display:
+                item.set_active(True)
+            item.connect("toggled", self.change_primary, display)
+            item.show()
+            primary.append(item)
+ 
+    def update_screen_resolutions(self, resolutions):
+    	for display in self.jupiter.displays:
+            res = self.jupiter.get_available_resolutions(display)
+            dp = gtk.Menu()
+            dp_item = gtk.MenuItem(display)
+            dp_item.set_submenu(dp)
+            dp_item.show()
+            rgroup = gtk.RadioMenuItem()
+            for name in res[1:5]:
+                item = gtk.RadioMenuItem(rgroup, name)
+                if res[0] == name:
+                   item.set_active(True)
+                item.connect("toggled", self.change_resolution, name,display)
+                item.show()
+                dp.append(item)
+            resolutions.append(dp_item)
+    
+    def update_devices_menu(self, devices):
+        if self.jupiter.wifi != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Wifi")
+            if self.jupiter.switch_state(self.jupiter.wifi):
+                check.set_active(True)
+                check.set_label('Disable Wifi')
+            check.connect("toggled", self.switch_device, 'wifi')
+            check.show()
+            devices.append(check)
+        
+        if self.jupiter.touchpad != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Touchpad")
+            if self.jupiter.switch_state(self.jupiter.touchpad):
+                check.set_active(True)
+                check.set_label('Disable Touchpad')
+            check.connect("toggled", self.switch_device, 'touchpad')
+            check.show()
+            devices.append(check)
+        
+        if self.jupiter.bluetooth != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Bluetooth")
+            if self.jupiter.switch_state(self.jupiter.bluetooth):
+                check.set_active(True)
+                check.set_label('Disable Bluetooth')
+            check.connect("toggled", self.switch_device, 'bluetooth')
+            check.show()
+            devices.append(check)
+
+    def update_performance_menu(self, performances):
+        mode = self.jupiter.get_device('/cpu_mode', 'cpu-control', 'initial')
+        radio = gtk.RadioMenuItem()
+        item = gtk.RadioMenuItem(radio, "Maximum Performance")
+        if mode == 'super':
+            item.set_active(True)
+        item.show()
+        item.connect("toggled", self.toggle_performance, 'super')
+        performances.append(item)
+        
+        item = gtk.RadioMenuItem(radio, "Power On Demand")
+        if mode == 'high':
+            item.set_active(True)
+        item.connect("toggled", self.toggle_performance, 'high')
+        item.show()
+        performances.append(item)
+        
+        item = gtk.RadioMenuItem(radio, "Power Saving")
+        if mode == 'powersave':
+            item.set_active(True)
+        item.connect("toggled", self.toggle_performance, 'powersave')
+        item.show()
+        performances.append(item)
+
+        self.cpu_mode = mode
+  
+    def update_menu_info(self):
+        msg = 'CPU Mode: ' + self.jupiter.get_cpu_mode_name()
+        self.current_temp = self.jupiter.get_temperature()
+        if self.current_temp != "0 ºC":
+            msg += '\nTemperature: ' + self.jupiter.get_temperature()
+        info = gtk.MenuItem(msg)
+        info.show()
+        info.set_sensitive(False)
+        self.menu.insert(info, 0)
+        
+    def elapsed_time(self):
+        msg = 'CPU Mode: ' + self.jupiter.get_cpu_mode_name()
+        self.current_temp = self.jupiter.get_temperature()
+        if self.current_temp != "0 ºC":
+            msg += '\nTemperature: ' + self.jupiter.get_temperature()
+
+        self.menu.get_children()[0].set_label(msg)
+
+        self.menu.get_children()[0].set_label(msg)
+        if self.jupiter.get_current_cpu_mode() != self.cpu_mode:
+            self.update_icon()
+            perfs = self.menu.get_children()[2].get_submenu()
+
+            for i in perfs.get_children():
+                perfs.remove(i)
+
+            self.update_performance_menu(perfs)
+            self.cpu_mode = self.jupiter.get_current_cpu_mode()
+
+	# get changed displays	
+	check = self.jupiter.get_displays()
+	# if the displays changed, update menus.
+	if check != self.jupiter.displays:
+	   self.jupiter.displays = check
+	   self.update_screen_menus()
+        return True
+    
+    def quit(self, widget, data=None):
+        gtk.main_quit()
+    
+    def toggle_performance(self, widget, data=None):
+        if data != None:
+            if widget.active:
+                if not self.jupiter.is_cpu_mode(data):
+                    self.jupiter.exec_command('cpu-control', data)
+                    if data == 'super':
+                        if loaded_indicator:
+                            self.ind.set_icon('bolt2')
+                        else:
+                            self.tray.set_from_icon_name('bolt2')
+                    elif data == 'high':
+                        if loaded_indicator:
+                            self.ind.set_icon('bolt1')
+                        else:
+                            self.tray.set_from_icon_name('bolt1')
+                    elif data == 'powersave':
+                        if loaded_indicator:
+                            self.ind.set_icon('bolt4')
+                        else:
+                            self.tray.set_from_icon_name('bolt4')
+                    else:
+                        if loaded_indicator:
+                            self.ind.set_icon('bolt3')
+                        else:
+                            self.tray.set_from_icon_name('bolt3')
+    
+    def switch_device(self, widget, data=None):
+        if data != None:
+            self.jupiter.exec_command(data, 'toggle')
+            state = self.jupiter.check_state('/' + data)
+            if self.jupiter.switch_state(state) == True:
+                widget.set_label('Disable ' + string.capwords(data))
+            elif self.jupiter.switch_state(state) == False:
+                widget.set_label('Enable ' + string.capwords(data))
+    
+    def change_resolution(self, widget, data, display):
+        if data != None:
+            if widget.active:
+                if self.jupiter.get_available_resolutions(display)[0] != data:
+                    self.jupiter.exec_command('resolutions', [data,display])
+    
+    def change_primary(self, widget, data):
+        if data != None:
+            if widget.active:
+                self.jupiter.exec_command('primary', ['default', data])
+
+    def change_orientation(self, widget, data=None,display=None):
+        if data != None:
+            if widget.active:
+                if not self.jupiter.is_current_rotation(data,display):
+                    self.jupiter.exec_command('rotate', [data,display])
+    
+    def about_dialog(self, widget, data=None):
+        dialog = JupiterAboutDialog()
+
+        dialog.run()
+        dialog.destroy()
+    
+    def change_video_display(self, widget, data=None):
+        if data != None:
+            if widget.active:
+                if not self.jupiter.is_current_display(data):
+                    self.jupiter.exec_command('vga-out', data)
+                    resolutions = gtk.Menu()
+                    self.menu.get_children()[6].set_submenu(resolutions)
+                    threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
+
+class JupiterAboutDialog(gtk.AboutDialog):
+    """ Class to handle the About Dialog of Jupiter """
+    
+    def __init__(self):
+        gtk.AboutDialog.__init__(self)
+        self.set_program_name(APP_TITLE)
+        self.set_version(APP_VERSION)
+        self.set_copyright(APP_COPYRIGHT)
+        self.set_comments(APP_DESCRIPTION)
+        
+        logo = gtk.icon_theme_get_default().load_icon('jupiter', 64, 0)
+        self.set_logo(logo)
+        self.set_website('http://www.jupiterapplet.org')
+        self.set_website_label('Homepage')
+    
+def main():
+    gtk.main()
+    return 0
+
+if __name__ == "__main__":
+    indicator = JupiterIndicator()
+    main()

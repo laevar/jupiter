@@ -1,0 +1,49 @@
+JUPITER_VAR="/var/jupiter"
+
+if [ -z "$NICON" ]; then
+  NICON="/usr/share/pixmaps/display.png"
+fi
+
+if [ -z "$JUPITER_PATH" ]; then
+  JUPITER_PATH="/usr/lib/jupiter/scripts"
+fi
+
+if [[ "$*" =~ "silent" ]]; then
+  NO_NOTIFY=1
+fi
+
+. $JUPITER_PATH/notify
+
+if [ ! -d "$JUPITER_VAR" ]; then
+  mkdir -p $JUPITER_VAR >/dev/null 2>&1 || true
+  chown -R root:jupiter $JUPITER_VAR >/dev/null 2>&1 || true
+  chmod 775 $JUPITER_VAR >/dev/null 2>&1 || true
+  chmod ug+s $JUPITER_VAR >/dev/null 2>&1 || true
+  setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX . >/dev/null 2>&1 || true
+fi
+
+function check_external {
+  if [ x"$SECOND_DEVICE" == x"" ]; then
+    notify $"External monitor not detected." $NICON
+    exit 1
+  fi
+}
+
+getXuser() {
+        local display userhome uid
+        if [ -z "$displaynum" ]; then
+                display=.+
+        else
+                display=":$displaynum"
+        fi
+        uid=$(ck-list-sessions | awk 'BEGIN { unix_user = ""; } /^Session/ { unix_user = ""; } /unix-user =/ { gsub(/'\''/,"",$3); unix_user = $3; } /x11-display = '\'$display\''/ { print unix_user; exit (0); }')
+
+        if [ -n "$uid" ]; then
+                user=$(getent passwd $uid | cut -d: -f1)
+                userhome=$(getent passwd $user | cut -d: -f6)
+                export XAUTHORITY=$userhome/.Xauthority
+        else
+                user=
+                export XAUTHORITY=""
+        fi
+}
