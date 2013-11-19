@@ -1,4 +1,3 @@
-/etc/init/jupiter-healthcheck.conf
 /etc/xdg/autostart/jupiter.desktop
 /etc/xdg/autostart/jupiter-startup.desktop
 /etc/pm/power.d/00-jupiter-cpu
