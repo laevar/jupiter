@@ -24,14 +24,12 @@ case "$1" in
         echo "Adding Jupiter group"
         /usr/sbin/groupadd jupiter
       fi
-      echo -n "Adding users to Jupiter group: "
-      for i in $(awk -F: '$6 ~ /\/home/ && $3 >= 1000 {print $1}' /etc/passwd);
-      do
-        echo -n $i" "
-        usermod -G jupiter -a $i 2>&1 >/dev/null ||:
-      done
-      echo -e "\nAdding jupiter to sudoers"
-      grep jupiter /etc/sudoers >/dev/null 2>&1 || echo "%jupiter ALL=NOPASSWD: /usr/lib/jupiter/scripts/bluetooth, /usr/lib/jupiter/scripts/camera, /usr/lib/jupiter/scripts/cpu-control, /usr/lib/jupiter/scripts/resolutions, /usr/lib/jupiter/scripts/rotate, /usr/lib/jupiter/scripts/touchpad, /usr/lib/jupiter/scripts/vga-out, /usr/lib/jupiter/scripts/wifi, /usr/lib/jupiter/scripts/primary" >> /etc/sudoers
+      #echo -n "Adding users to Jupiter group: "
+      #for i in $(awk -F: '$6 ~ /\/home/ && $3 >= 1000 {print $1}' /etc/passwd);
+      #do
+      #  echo -n $i" "
+      #  usermod -G jupiter -a $i 2>&1 >/dev/null ||:
+      #done
       echo "Setting permissions.."
       chown -R root:jupiter /usr/lib/jupiter
       chown -R root:root /etc/acpi/events
@@ -43,7 +41,10 @@ case "$1" in
       if [ -d "/var/jupiter" ]; then
 	chown -R root:jupiter /var/jupiter
         chmod -R 775 /var/jupiter
+	chmod ug+s /var/jupiter
+	setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX /var/jupiter
       fi
+
 
       if [ -e "/usr/lib/jupiter/scripts/jupiter" ]; then
         /usr/lib/jupiter/scripts/jupiter ||:
@@ -57,6 +58,15 @@ case "$1" in
 
       if [ -e "/etc/pm/sleep.d/00-jupiter-wifi" ]; then
         rm -f /etc/pm/sleep.d/00-jupiter-wifi 2>&1 >/dev/null ||:
+      fi
+      if [ -e "/etc/init/jupiter-healthcheck.conf" ]; then
+        rm -f /etc/init/jupiter-healthcheck.conf  2>&1 >/dev/null ||:
+      fi
+      if [ -e "/etc/pm/power.d/00-jupiter-cpu" ]; then
+        rm -f /etc/pm/power.d/00-jupiter-cpu  2>&1 >/dev/null ||:
+      fi
+      if [ -e "/etc/pm/sleep.d/00-jupiter-restore" ]; then
+        rm -f /etc/pm/sleep.d/00-jupiter-restore  2>&1 >/dev/null ||:
       fi
 
 

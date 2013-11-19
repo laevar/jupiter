@@ -1,2 +1,0 @@
-event=hotkey A[TS][KU][DS]
-action=/etc/acpi/actions/eeepc-actions.sh %e
