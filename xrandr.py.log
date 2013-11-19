@@ -1,0 +1,42 @@
+#changes in xrandr 1.2 python library:
+
+Class Output:
+    
+    # for consistency: has caused trouble defining whether or not output has changed
+    disable(): + Output._info.contents.crtc=0
+    
+Class Crtc:
+    
+    # for consistency: has caused trouble defining whether or not Crtc changed and finding the right position
+    disable():  + Crtc._info.contents.x=0
+                + Crtc._info.contents.y=0
+                + self._info.contents.noutput=0
+    
+    # for consistency and as a necessity due to former changes: 
+    add_output():+ output._info.contents.crtc = self.xid
+                 + output._changes = output._changes | CHANGES_CRTC | CHANGES_MODE
+                 + output._crtc = self
+                 + if self._info.contents.noutput!=1:
+                 +   self._info.contents.noutput=1
+    
+    supports_output():
+                # manually shift the rotation if not automatically done. Lead to troubles changing the rotation
+                + if self._info.contents.rotation < RR_ROTATE_0 or self._info.contents.rotation > RR_ROTATE_270:
+                +     self._info.contents.rotation= self._info.contents.rotation & 0xf
+                # using the correctly set variables from the crtc instead of those who are not automatically set or dont exist anyway
+                - if self._info.rotation != output._rotation: return False
+                - if self._info.contents.mode_info != output._mode: return False
+                + if self._info.contents.mode != output._mode: return False
+                + if self._info.contents.rotation != output._rotation: return False
+
+Class Screen:
+
+    apply_output_config():
+                #removed changes in this function. is done in add_output now.
+                - output._changes = output._changes | CHANGES_CRTC
+
+    _calculate_size():
+                #added comments to possible calculation of physical height. Failed until now, but may have to do with a premature call of XRRSetScreenSize
+    
+
+    
