@@ -39,42 +39,10 @@ case "$1" in
       fi
 
       if [ -d "/var/jupiter" ]; then
-	chown -R root:jupiter /var/jupiter
+       	chown -R root:jupiter /var/jupiter
         chmod -R 775 /var/jupiter
-	chmod ug+s /var/jupiter
-	setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX /var/jupiter
-      fi
-
-
-      if [ -e "/usr/lib/jupiter/scripts/jupiter" ]; then
-        /usr/lib/jupiter/scripts/jupiter ||:
-      fi
-      if [ -e "/usr/sbin/update-rc.d" ]; then
-	if [ -e "/etc/init.d/ondemand" ]; then
-	  echo "Removing startup links to ondemand CPU mode"
-	  update-rc.d -f ondemand remove 2>&1 >/dev/null
-	fi
-      fi
-
-      if [ -e "/etc/pm/sleep.d/00-jupiter-wifi" ]; then
-        rm -f /etc/pm/sleep.d/00-jupiter-wifi 2>&1 >/dev/null ||:
-      fi
-      if [ -e "/etc/init/jupiter-healthcheck.conf" ]; then
-        rm -f /etc/init/jupiter-healthcheck.conf  2>&1 >/dev/null ||:
-      fi
-      if [ -e "/etc/pm/power.d/00-jupiter-cpu" ]; then
-        rm -f /etc/pm/power.d/00-jupiter-cpu  2>&1 >/dev/null ||:
-      fi
-      if [ -e "/etc/pm/sleep.d/00-jupiter-restore" ]; then
-        rm -f /etc/pm/sleep.d/00-jupiter-restore  2>&1 >/dev/null ||:
-      fi
-
-
-      if [ -e "/etc/init.d/acpid" ]; then
-        echo Restarting ACPI
-        service acpid restart >/dev/null 2>&1 ||:
-      else
-        echo -e "\nPlease reboot your portable at your earliest convenience."
+      	chmod  ug+s /var/jupiter
+       	setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX /var/jupiter
       fi
     ;;
 
