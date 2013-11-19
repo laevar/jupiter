@@ -1,0 +1,120 @@
+Jupiter updates:
+
+Goals: Using faster python library instead of massive scrpit overhead.
+       Get rid of the bash script funeral.
+       Better clone mode (no cutoffs)
+       Individual settings saved for different monitor combinations
+       Extend tool to work for more than two monitors as well
+       
+Major changes:
+
+    - No need to use xrandr parsing via shell scripts and querying xrandr requests all
+    the time for consistency. Monitor setting changes are directly done via
+    the python xrandr library.
+
+    - Cloning of monitors is now performed after calculating the maximum shared
+    resolution, so that the monitor with the lower capable max resolution does not
+    become cut off.
+
+    - Preferred settings are not saved imprecisely via the connections
+    (LVDS1, VGA1, DP1, etc.), but instead the edid data is used to individually
+    identify the used monitors by and store/apply the settings.
+
+    - Powersave settings changed, only powersave True and False can be selected. Using
+    pictures from std.library instead of lightning bolt.
+
+Bugs:
+
+    - Powersave changes cannot be applied (only as root). pm-powersave was the idea.
+    Now probably something else has to be found. 
+
+    - After disabling one monitor/Crtc, the reactivation via the python xrandr
+    library shows different results (monitor switches on correctly, does not switch
+    back on but tells xrandr, that it is on, or sometimes general errors leading
+    to crash of program invoked by the underlying C libraries.)
+
+    - In general, there are some issues setting the correct screen size.
+    It becomes problematic, when the larger monitor is disabled or when a situation
+    occurs when one monitor is left of the other. (Screensize remains same but
+    f.e. toolbar is extended to the limit of the screen, not the output)
+
+    - Think about way in which jupiter recognizes external xrandr calls without queying    and parsing xrandr output all the time.
+
+    - Testing? Does it work with 1 monitor only without disturbance?
+
+Changes in detail:
+
+Class Jupiter:
+
+ def __init__:
+    added variables for internal storage and only edid parsing
+
+ def __repr__:
+    returns all important variable values for the screen, crtcs and outputs.
+    Can be used for Debugging.
+
+ def get_current_cpu_mode():
+     current_primary():
+     get_current_relation():
+
+    getters for variables.
+
+ def find_position(change_output, relation_output):
+    calculates the relation between two Crtcs/Outputs
+
+ def save_pref_res():
+    saves the current preferred settings
+
+ def load_pref_res():
+    loads preferred settings
+
+ def create_filename():
+    creates unique filename for setting storage using edid identifier
+
+ def parse_edid(outputname):
+    parses edid_data and returns dictionary with important monitor values
+
+Class JupiterIndicator:
+
+ def update_data() :
+    updates the screen/crtc/output data by calling the xrandr library (case sth changed    during usage)
+
+ def update_screen_menus():
+    updates screen menus in case data is updated externally
+ def update_video_displays(displays):
+     update_screen_orientation(orientations):
+     update_primary(primary):
+     update_screen_resolutions(resolutions):
+     update_performance_menu(performances):
+     update_menu_info():
+
+   replaced the old functions with new ones using python functionality and adjusting them to work properly and add one or two minor functionalities
+
+ def toggle performance(powersave):
+    supposed to change powersave settings. Does not work because of needed root rights     for pm-powersave (try thinking about something else)
+
+ def _apply_output_cfg():
+    Applies changes to outputs and crtcs. Updates data (is it needed? Or welcome?)
+
+ def set_resolution(mode,change_op,rel_op):
+    Calling function to change resolution
+
+ def change_resolution(self,widget,resolution,outputname):
+    changes resolution
+
+ def change_current_relation(self):
+     In case of relation not from primary point of view, relation has to be adjusted
+
+ def change_primary(self, widget, outputname):
+        Changes the primary monitor
+
+ def rotate_output(self,outputname,rotation):
+     Rotates an output
+ 
+ def switch_displays(self,relation):
+     Switches displays
+
+ def change_video_display(self, widget, relation=None):
+     Calls for update screen resolutions
+
+ all of the above: adjusted to use with xrandr library.

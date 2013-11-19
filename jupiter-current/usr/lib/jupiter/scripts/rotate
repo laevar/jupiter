@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# $VIDEO_DEVICE Rotate
+# Andrew Wyatt
+# Tool to rotate $VIDEO_DEVICE panel
+#
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+NICON="/usr/share/pixmaps/rotate.png"
+
+. $JUPITER_PATH/common
+
+. $JUPITER_PATH/devices
+
+if [ ! "$2" ]; then
+  VIDEO_DEVICE=$FIRST_DEVICE
+else
+  VIDEO_DEVICE="$2"
+fi
+VIDEO_STATUS=$(echo "$VGA_XRANDR" | grep "$VIDEO_DEVICE.* connected" >/dev/null 2>&1 && echo connected)
+CURRENT=$(echo "$VGA_XRANDR"  | grep $VIDEO_DEVICE | awk '{print $4}' | sed s#^\(##)
+
+function rotate_toggle {
+  if [ "$CURRENT" = "left" ]; then
+    $JUPITER_PATH/resolutions default $VIDEO_DEVICE
+    ROTATION="inverted"
+    RTOUCHPAD=2
+  elif [ "$CURRENT" = "inverted" ]; then
+    $JUPITER_PATH/resolutions default $VIDEO_DEVICE
+    ROTATION="right"
+    RTOUCHPAD=3
+  elif [ "$CURRENT" = "right" ]; then
+    ROTATION="normal"
+    RTOUCHPAD=0
+  else
+    $JUPITER_PATH/resolutions default $VIDEO_DEVICE
+    ROTATION="left"
+    RTOUCHPAD=1
+  fi
+  if [ "$ROTATION" ]; then
+    echo "$ROTATION $RTOUCHPAD" > $JUPITER_VAR/rotation_saved_$VIDEO_DEVICE
+    rotate_display $ROTATION $RTOUCHPAD
+  fi
+}
+
+function restore_rotation {
+  if [ -e "$JUPITER_VAR/rotation_saved_$VIDEO_DEVICE" ]; then
+    RMODES=$(cat $JUPITER_VAR/rotation_saved_$VIDEO_DEVICE)
+    ROTATION=$(echo $RMODES | awk '{print $1}')
+    RTOUCHPAD=$(echo $RMODES | awk '{print $2}')
+    if [ ! "$CURRENT" = "$ROTATION" ]; then
+      NO_NOTIFY=1
+      if [ ! "$CURRENT" = "normal" ]; then
+        $JUPITER_PATH/resolutions default $VIDEO_DEVICE
+      fi
+      rotate_display $ROTATION $RTOUCHPAD
+    fi
+  fi
+}
+
+function rotate_display {
+    if [ ! "$3" = "silent" ]; then
+      notify $"Rotate LCD \"$1\"" $NICON
+    else
+      NO_NOTIFY=1
+    fi
+    if [ ! "$1" = "normal" ]; then
+      $JUPITER_PATH/resolutions default $VIDEO_DEVICE
+    fi
+    xrandr --output $VIDEO_DEVICE --rotate "$1"
+    synclient orientation=$2 2>/dev/null
+    echo "$1 $2" > $JUPITER_VAR/rotation_saved_$VIDEO_DEVICE
+}
+
+case $1 in
+  inverted)
+    rotate_display inverted 2
+  ;;
+  left)
+    rotate_display left 1
+  ;;
+  right)
+    rotate_display right 3
+  ;;
+  normal)
+    rotate_display normal 0
+  ;;
+  default)
+    rotate_display normal 0 silent
+  ;;
+  restore)
+    restore_rotation
+  ;;
+  *)
+    rotate_toggle
+  ;;
+esac

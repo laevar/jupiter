@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Add support for SHE, and provide GMA overclock all in one utility
+#
+
+if [[ $(dmidecode -s processor-version) =~ "Atom" ]]; then
+  if [[ $(lspci -s 00:02.0) =~ "945GME" ]]; then
+    GMABOOST=1
+  fi
+fi
+
+
+if [ -e "/sys/devices/platform/eeepc/she" ]; then
+  SHE_DEVICE="/sys/devices/platform/eeepc/she"
+elif [ -e "/sys/devices/platform/eeepc/cpufv" ]; then
+  SHE_DEVICE="/sys/devices/platform/eeepc/cpufv"
+else
+  exit 0
+fi
+
+case $1 in
+  super)
+    echo "0" > $SHE_DEVICE
+    if [ "$GMABOOST" = "1" ]; then
+      # Overclock to 400MHz (normal GMA950 speed)
+      setpci -s 00:02.0 f0.b=00,60
+      setpci -s 00:02.0 f0.b=33,05
+    fi
+  ;;
+  high)
+    echo "1" > $SHE_DEVICE
+    if [ "$GMABOOST" = "1" ]; then
+      # Increase clock to 250MHz
+      setpci -s 00:02.0 f0.b=00,60
+      setpci -s 00:02.0 f0.b=31,05
+    fi
+  ;;
+  powersave)
+    echo "2" > $SHE_DEVICE
+    if [ "$GMABOOST" = "1" ]; then
+      # Reduce clock to 200MHz (GMA950 speed on Eee PCs)
+      setpci -s 00:02.0 f0.b=00,60
+      setpci -s 00:02.0 f0.b=34,05
+    fi
+  ;;
+  *)
+    exit 0
+  ;;
+esac

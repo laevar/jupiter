@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+#  WIFI Toggle
+#  by Andrew Wyatt
+#  Generic WIFI toggle utility
+#
+
+JUPITER_VAR="/var/jupiter"
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+WIFI_STATE=$(rfkill list wlan 2>/dev/null | grep Soft 2>/dev/null | awk '{print $3}' | head -n 1 )
+
+if [[ "$*" =~ "silent" ]]; then
+  NO_NOTIFY=1
+fi
+
+. $JUPITER_PATH/notify
+
+NICON="/usr/share/pixmaps/gnome-dev-wavelan.png"
+
+if [ -e $JUPITER_VAR/wifi_saved ]; then
+  RADIO_SAVED_STATE=$(cat $JUPITER_VAR/wifi_saved)
+else
+  RADIO_SAVED_STATE=0
+fi
+
+if [ ! -d "$JUPITER_VAR" ]; then
+  mkdir $JUPITER_VAR 2>/dev/null
+fi
+
+WIFI_IF=$(iwconfig 2>/dev/null | grep ESSID | awk '{print $1}')
+
+function wifi_status {
+  if [ "$WIFI_STATE" = "no" ]; then
+    echo "ON"
+  elif [ "$WIFI_STATE" = "yes" ]; then
+    echo "OFF"
+  else
+    echo "UNKNOWN"
+    exit 0
+  fi
+}
+
+function radio_on {
+  notify $"WIFI Radio on" $NICON
+  rfkill unblock wlan >/dev/null 2>&1
+  echo 1 > $JUPITER_VAR/wifi_saved
+}
+
+function radio_off {
+  notify $"WIFI Radio off" $NICON
+  rfkill block wlan >/dev/null 2>&1
+  echo 0 > $JUPITER_VAR/wifi_saved
+}
+
+function radio_poweroff {
+  rfkill block wlan >/dev/null 2>&1
+}
+
+function radio_toggle {
+  if [ "$WIFI_STATE" = "no" ]; then
+    radio_off
+  else
+    radio_on
+  fi
+}
+
+function radio_restore {
+  NO_NOTIFY=1
+  if [ "$RADIO_SAVED_STATE" = "1" ]; then
+    if [ "$RADIO_STATE" = "0" ]; then
+      radio_on
+    fi
+  else
+    if [ "$RADIO_STATE" = "1" ]; then
+      radio_off
+    fi
+  fi
+}
+
+case $1 in
+  restore)
+    radio_restore
+  ;;
+  status)
+    wifi_status
+  ;;
+  on|enable)
+    radio_on
+  ;;
+  off|disable)
+    radio_off
+  ;;
+  poweroff)
+    radio_poweroff
+  ;;
+  *)
+    radio_toggle
+  ;;
+esac

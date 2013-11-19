@@ -1,0 +1,1063 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+#  Jupiter
+#  
+#  Copyright 2012 Jorge Luis Betancourt <betancourt.jorge@gmail.com> and Andrew Wyatt
+#  Copyright 2007-2011 Andrew Wyatt
+#
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+#  
+#  
+
+import pygtk
+import os
+import glob 
+pygtk.require('2.0')
+import gtk, gobject
+import subprocess
+import re
+import time
+import string
+import threading
+import xrandr.xrandr as xrand
+import subprocess
+from xrandr import edid1 as edid
+
+try:
+    import appindicator
+    loaded_indicator = True
+except ImportError, ex:
+    loaded_indicator = False
+
+APP_TITLE = 'Jupiter'
+APP_DESCRIPTION = 'Generic interface for display, power, and device control.'
+APP_COPYRIGHT = 'Copyright 2009-2012 Andrew Wyatt (Fewt)\n and Jorge Luis Betancourt'
+APP_VERSION = '0.1.11'
+PATH = "/usr/lib/jupiter/scripts"
+VENDOR_PATH = "/usr/lib/jupiter/vendors"
+VAR_PATH = "/var/jupiter"
+DIR="/sys/class/drm/"
+before= open("/var/jupiter/jupiter_before.log","a")
+after= open("/var/jupiter/jupiter_after.log","a")
+
+class Jupiter:
+    """ Class to handle all possible configurations for the devices """
+    
+    def __init__ (self, path, vendors, var):
+	#extended init to internally store unchaning values, not query for them any time
+        self.path = path
+        self.vendors = vendors
+        self.var = var
+        self.temp = '/sys/devices/virtual/hwmon/hwmon0/temp1_input'
+        #self.cpu_freq = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+        self.powersave=False
+        self.bluetooth = self.check_state('/bluetooth')
+        self.wifi = self.check_state('/wifi')
+        self.touchpad = self.check_state('/touchpad')
+        self.vendor = self.get_vendor()
+        self.primary=''
+        self.video_modes = False
+	# getting data from xrandr library
+        self.screen = xrand.get_current_screen()
+        self.monitors=self.screen.crtcs
+        self.outputs = self.screen.get_outputs()
+        self.features={}
+        self.rotations=[]
+        secondary=''
+        for op in self.outputs:
+	    # one time edid parsing
+            ediddata=self.parse_edid(op.name)
+            monitorname=""
+            identifier=""
+            if ediddata!=None:
+                print ediddata
+                if ediddata.get('serial_32') != None and ediddata.get('serial_32') !=0:
+		    # arrange individual identifier from edid parsing
+                    identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("serial_32"))
+                    print identifier
+                else:
+                    identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("product_id"))
+                    print identifier
+            try:
+                if ediddata.get('monitor_name')!=None:
+                    monitorname=ediddata.get('monitor_name')
+                else:
+                    monitorname=op.name
+                print monitorname
+            except:
+                monitorname=op.name
+                print "asdf " + monitorname
+            self.features[op.name]={'output':op,'edid':ediddata,'monitorname':monitorname,'identifier':identifier}
+            if op.name=='LVDS1':
+		# if no saved data: Setting LVDS1 primary by default.
+                print 'weeeeeeeeeeeeeeeee' 
+                self.features.get(op.name)['primary']=True
+                try:
+                    self.features.get(self.primary)['primary']=False
+                    secondary=self.primary
+                except:
+                    print 'not yet entered a primary'
+                self.primary=op.name
+            else:
+		# if no LVDS1 available, randomly choose primary if no saved data
+                if self.primary=='':
+                    self.features.get(op.name)['primary']=True
+                    self.primary=op.name
+                else:
+                    self.features.get(op.name)['primary']=False
+                    secondary=op.name
+            self.rotations.append(op._rotation)
+        self.currentMode=0
+	# find current position of monitors
+        self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
+        self.displays = []
+        self.performance_modes = {
+            'high'  : 'Power On Demand',
+            'powersave' : 'Power Savings '
+        }
+    
+    # new!
+    def __repr__(self):
+	""" Debugging function. Prints all major variables of current Screen, Crtcs and Outputs."""
+	s="Screen info:\n"
+        s+=" width: " + str(self.screen._width) + "\n"
+        s+=" height: " + str(self.screen._height) + "\n"
+        s+=" height mm: " + str(self.screen._width_mm) + "\n"
+        s+=" width mm: " + str(self.screen._width_mm) + "\n"
+        s+=" rate: " + str(self.screen._rate) + "\n"
+        s+=" rotation: " + str(self.screen._rotation) + "\n"
+        s+="CRTC info:\n"
+        for crtc in self.monitors:
+            s+="Monitor XID" + str(crtc.xid) + "\n"
+            s+=" has changed?: " + str(crtc.has_changed()) + "\n"
+            s+=" outputs: " + str(crtc._outputs) + "\n"
+            s+=" screen: " + str(crtc._screen) + "\n"
+            s+=" height: " + str(crtc._info.contents.height) + "\n"
+            s+=" width: " + str(crtc._info.contents.width) + "\n"
+            s+=" mode: " + str(crtc._info.contents.mode) + "\n"
+            s+=" number of outputs: " + str(crtc._info.contents.noutput) + "\n"
+            s+=" outputs (C): " + str(crtc._info.contents.outputs) + "\n"
+            s+=" rotation: " + str(crtc._info.contents.rotation) + "\n"
+            s+=" position x: " + str(crtc._info.contents.x) + "\n"
+            s+=" position y: " + str(crtc._info.contents.y) + "\n"
+        s+="Output Info:\n"
+        for output in self.outputs:
+            s+=" Name: " + output.name + "\n"
+            s+=" Parent Crtc xid: "+ str(output.get_crtc()) + "\n"
+            s+=" has changed?: " + str(output.has_changed()) + "\n"
+            s+=" id: " + str(output.id) + "\n"
+            s+=" is_active?: " + str(output.is_active()) + "\n"
+            s+=" is connected?: " + str(output.is_connected())+ "\n"
+            s+=" changes flag: " + str(output._changes) + "\n"
+            s+=" crtc memory: " + str(output._crtc) + "\n"
+            s+=" mode: " + str(output._mode) + "\n"
+            s+=" position: " + str(output._position) + "\n"
+            s+=" rate: " + str(output._rate) + "\n"
+            s+=" reflection: " + str(output._reflection) + "\n"
+            s+=" relation: " + str(output._relation) + "\n"
+            s+=" relation_offset: " + str(output._relation_offset) + "\n"
+            s+=" relative to output: " + str(output._relative_to) + "\n"
+            s+=" rotation: " + str(output._rotation) + "\n"
+            s+=" screen: " + str(output._screen) + "\n"
+            s+=" x: " + str(output._x) + "\n"
+            s+=" y: " + str(output._y) + "\n"
+            s+=" Clones (C): " + str(output._info.contents.clones) + "\n"
+            s+=" Connection (C): " + str(output._info.contents.connection) + "\n"   
+            s+=" Crtc: " + str(output._info.contents.crtc) + "\n"
+            s+=" Crtcs: " + str(output._info.contents.crtcs) + "\n"
+            s+=" mm_height: " + str(output._info.contents.mm_height) + "\n"
+            s+=" mm_width: " + str(output._info.contents.mm_width) + "\n"
+            s+=" modes: " + str(output._info.contents.modes) + "\n"
+            s+=" nclone: " + str(output._info.contents.nclone) + "\n"
+            s+=" number crtcs: " + str(output._info.contents.ncrtc) + "\n"
+            s+=" number modes: " + str(output._info.contents.nmode) + "\n"
+            s+=" Crtc: " + str(output._info.contents.crtc) + "\n"
+            s+=" Crtcs: " + str(output._info.contents.crtcs) + "\n"
+            s+=" mm_height: " + str(output._info.contents.mm_height) + "\n"
+            s+=" mm_width: " + str(output._info.contents.mm_width) + "\n"
+            s+=" modes: " + str(output._info.contents.modes) + "\n"
+        return s
+
+    def get_output(self, command, args=None, msg=None, sudo=False):
+        """ Execute a command and returns the standard output, deleting
+        all new line characters """
+        try:
+            cmd = []
+            if sudo: 
+                cmd = ['sudo']
+            if type(args) == type([]):
+                cmd += [self.path + command] + args
+            else:
+                cmd += [self.path + command, args]
+            # data = subprocess.check_output(cmd, shell=False, stderr=fh).replace('\n','')
+            # FIX for python 2.6, backward compatibility
+            return subprocess.Popen(cmd, shell=False, stderr=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].replace('\n','')
+        except Exception, ex:
+            if msg != None:
+                print msg + ex
+        return False
+    
+    def check_state(self, cmd):
+        """ Check the status of the device passed as cmd """
+        return self.get_output(cmd, 'status')
+
+    def get_vendor(self):
+        """ Get the CPU vendor model of the computer """
+        return self.get_output('/cpu-control', 'vendor', 'Unable to get vendor information for this system', True)
+        
+    def get_video_modes(self):
+        """ Detect the available video modes (resolutions) """
+        self.video_modes = True
+        cmd = ['sudo', self.path + '/resolutions', 'modes']
+        try:
+            subprocess.Popen(cmd, shell=False).wait()
+            return True
+        except Exception, ex:
+            print 'Unable to capture available video modes + ' + ex
+        cmd = ['sudo', self.path + '/resolutions', 'modes','VGA1']
+        try:
+            subprocess.Popen(cmd, shell=False).wait()
+            return True
+        except Exception, ex:
+            print 'Unable to capture available video modes + ' + ex
+        return False
+
+    def exec_command(self, cmd, args):
+        """ Execute custom command and returns the standard output
+        customizing the error message """
+        return self.get_output('/' + cmd, args, 'Unable to execute command: ' + cmd + ' with arguments ' + str(args), True)
+    
+    def switch_state(self, state):
+        """ Switch throw state, return True or False according to the
+        activation status [ON|OFF] of the device """
+        if state == 'OFF' or state == '0':
+            return False
+        elif state == 'ON' or state == '1':
+            return True
+        else:
+            return None
+    
+    def collect_data(self, args):
+        """ Read the content of the file, replacing all new line characters
+        and returns the content """
+        try:
+            f = open(args, 'r')
+            return f.read().replace('\n', '')
+        except Exception:
+            pass
+        return False
+
+    def match_active_device(self, fname, expr, command=None, args=None):
+        data = self.collect_data(self.var + fname)
+        if data == False:
+            self.exec_command(command, args)
+            return True
+        if re.match(expr, data):
+            return True
+        return False
+    
+    def get_device(self, fname, cmd=None, args=None):
+        data = self.collect_data(self.var + fname)
+        if data == False:
+            self.exec_command(cmd, args)
+            data = self.collect_data(self.var + fname)
+        return data
+
+    def is_cpu_mode(self, args=''):
+        return args==self.powersave
+    
+    def get_current_cpu_mode(self):
+	"""Returns whether or not powersave is on or off."""
+        return self.powersave
+    
+    def get_cpu_mode_name(self):
+        return self.performance_modes[self.get_device('/cpu_mode', 'cpu-control', 'initial')]
+    
+    #def current_rotation(self,args):
+        #return self.get_device('/rotation_saved_'+args, 'rotate', ['normal',args]).split(' ')[0]
+    
+    def current_primary(self):
+	""" Returns current primary"""
+        return self.primary
+
+    #def is_current_rotation(self, args,display):
+        #return self.match_active_device('/rotation_saved_'+display, args, 'rotate', ['normal ',display])
+
+    def get_current_relation(self):
+	""" Returns current relation."""
+        return self.currentRelation
+
+    def is_current_display(self, args):
+        return self.match_active_device('/vga_saved', args, 'vga-out', 'clone')
+
+    def get_displays(self):
+        #self.update_data()
+        displays=[]
+        for op in self.outputs:
+            if op.is_active:
+                displays.append(op.name)
+        return displays
+
+    #def get_available_resolutions(self, args):
+        #return self.get_device('/available_resolutions_' + args,'resolutions','modes ' + args).split(' ')
+    
+    def get_temperature(self):
+        temp = int(self.collect_data(self.temp))
+        temp = temp / 1000
+        return str(temp) + ' ºC'
+
+    def find_position(self,change_output,relation_output):
+	""" Calculates the current position of the Crtcs/Outputs relative to each other"""
+        relation=0
+        change_x=0
+        change_y=0
+        relation_x=0
+        relation_y=0
+	# change output not active but connected -> secondary only
+        if not change_output.is_active() and change_output.is_connected():
+            return 5
+	# relation output not active but connected -> primary only
+        if not relation_output.is_active() and relation_output.is_connected():
+            return 6
+        for monitor in self.monitors:
+            if monitor.get_outputs()[0].name==change_output.name:
+                change_x=monitor._info.contents.x
+                change_y=monitor._info.contents.y
+                print "change x change y " + str(change_x) + " " + str(change_y)
+            else:
+                relation_x=monitor._info.contents.x
+                relation_y=monitor._info.contents.y
+	# based on position relative to each other -> assign relations
+        if change_x < relation_x:
+            relation=xrand.RELATION_LEFT_OF
+        elif change_x > relation_x:
+            relation=xrand.RELATION_RIGHT_OF
+        elif change_y < relation_y:
+            relation=xrand.RELATION_ABOVE
+        elif change_y > relation_y:
+            relation=xrand.RELATION_BELOW
+        else:
+            relation=xrand.RELATION_SAME_AS
+        return relation
+
+    def save_pref_res(self):
+	""" Saves the current preferred settings"""
+	# filename consists of unique identifier got by edid parsing
+        print self.create_filename()
+        fo = open(self.create_filename(),"w")
+        print 'save ' + self.create_filename()
+        for x in range(0,len(self.outputs)):
+            if self.outputs[x].is_active():
+                fo.write("["+self.outputs[x].name + "]\n")
+                fo.write("primary="+str(self.outputs[x].name==self.primary)+"\n")
+                fo.write("rotation="+str(self.rotations[x])+"\n")
+                mode=None
+                for i in range(0,len(self.outputs[x].get_available_modes())):
+                    if self.outputs[x]._mode==self.outputs[x].get_available_modes()[i].id:
+                        mode=i
+                        break
+                fo.write("resolutionmode="+str(mode)+"\n")
+                if self.outputs[x].name==self.primary:
+                    fo.write("relation="+str(self.currentRelation)+"\n")
+        fo.write("!powersave="+str(self.powersave))
+        fo.close()
+
+    def load_pref_res(self):
+	""" Attempts to load preferred settings if they exist"""
+        try:
+            fo = open(self.create_filename(),"r")
+            curOutput=None
+            outname=None
+            for line in fo:
+                if line.startswith("["):
+                    outname=line.replace("[","").replace("]","").replace("\n","")
+                    print outname
+                elif line.startswith("!"):
+                    ps=line.split("=")[1].replace("\n","")
+                    if ps=="True":
+                        self.powersave=True
+                    else:
+                        self.powersave=False
+                else:
+                    if "primary" in line:
+                        prim=line.split("=")[1].replace("\n","")
+                        if prim=="True":
+                            if self.primary != outname:
+                                self.features.get(self.primary)['primary']=False
+                                self.features.get(outname)['primary']=True
+                                self.primary=outname
+                        else:
+                            self.features.get(outname)['primary']=False
+                    elif "rotation" in line:
+                        self.features.get(outname).get('output')._rotation=int(line.split("=")[1].replace("\n",""))
+                        #self.outputs[curOutput]._rotation=int(line.split("=")[1].replace("\n",""))
+                    elif "resolutionmode" in line:
+                        mode = None
+                        try:
+                            mode=int(line.split("=")[1].replace("\n",""))
+                        except:
+                            mode=0
+                        self.features.get(outname).get('output').set_to_mode(mode)
+                        self.currentMode=mode
+                        #self.outputs[curOutput].set_to_mode(int(line.split("=")[1].replace("\n","")))
+                    elif "relation" in line:
+                        relOutput=None
+                        for op in self.outputs:
+                            if op.is_active() and op.name!=outname:
+                                relOutput=op
+                        mode = int(line.split("=")[1].replace("\n",""))
+                        if mode < 5:
+                            self.features.get(outname).get('output').set_relation(relOutput.name,mode)
+                        elif mode ==5:
+                            relOutput.disable()
+                        elif mode ==6:
+                            self.features.get(outname).get('output').disable()
+                        self.currentRelation=mode
+            self.screen.apply_output_config()
+        except:
+            print "No saved preferences could be found. Opening default settings."
+        
+    def create_filename(self):
+	""" Creates unique filename for storage of setting using edid identifier"""
+        filename="/var/jupiter/saved_"
+        for op in self.outputs:
+            filename+=self.features.get(op.name).get('identifier')
+        return filename
+
+    def parse_edid(self,outputname=None):
+	""" Parses all available edid data and returns a dictionary with all important values"""
+        edids=glob.glob(DIR+"/*/edid")
+        for ed in edids:
+            if outputname in ed.replace("-",""):
+                try:
+                    fo=open(ed,"r")
+                    data=""
+                    for line in fo:
+                        data+=line
+                    fo.close()
+                    return edid.parse_edid(data)
+                except:
+                    return None
+
+class JupiterIndicator:
+    """ Class to handle the Indicator, indicator menu and GUI """
+    def __init__(self):
+        if loaded_indicator:
+            self.ind = appindicator.Indicator ("jupiter-client", "indicator-messages", appindicator.CATEGORY_APPLICATION_STATUS)
+            self.ind.set_status (appindicator.STATUS_ACTIVE)
+            self.ind.set_attention_icon ("indicator-messages-new")
+            self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
+            self.ind.set_icon('xfce4-splash')
+        else:
+            self.tray = gtk.StatusIcon()
+            self.tray.set_from_icon_name('xfce4-splash')
+            self.tray.set_visible(True)
+        
+        self.jupiter = Jupiter(PATH, VENDOR_PATH, VAR_PATH)
+	# loading of preferred settings takes place if there are any
+        self.jupiter.load_pref_res()
+        self.update_icon()
+        # create the principal menu
+        self.menu = gtk.Menu()
+        performances = gtk.Menu()
+        devices = gtk.Menu()
+        resolutions = gtk.Menu()
+        orientations = gtk.Menu()
+        primary = gtk.Menu()
+        displays = gtk.Menu()
+
+        # create menu items for the menus, about and exit
+        perf_item = gtk.MenuItem('Performance')
+        dev_item = gtk.MenuItem('Devices')
+        res_item = gtk.MenuItem('Screen Resolutions')
+        ort_item = gtk.MenuItem('Screen Orientation')
+        prim_item = gtk.MenuItem('Primary Display')
+        disp_item = gtk.MenuItem('Video Displays')
+        
+        # link the menu item with the corresponding submenu
+        perf_item.set_submenu(performances)
+        perf_item.show()
+        dev_item.set_submenu(devices)
+        dev_item.show()
+        res_item.set_submenu(resolutions)
+        res_item.show()
+        ort_item.set_submenu(orientations)
+        ort_item.show()
+        prim_item.set_submenu(primary)
+        prim_item.show()
+        disp_item.set_submenu(displays)
+        disp_item.show()
+
+
+        # Create and visualize a separator
+        seps = []
+        for i in range(0,4):
+            sep = gtk.SeparatorMenuItem()
+            sep.show()
+            seps.append(sep)
+        
+        # Add all the menu items
+        self.menu.append(seps[3])
+        self.menu.append(perf_item)
+        self.menu.append(seps[0])
+        self.menu.append(dev_item)
+        self.menu.append(seps[1])
+        self.menu.append(res_item)
+        self.menu.append(ort_item)
+        self.menu.append(prim_item)
+        self.menu.append(disp_item)
+        self.menu.append(seps[2])
+
+        # Get external monitor, if any (assume there is only one)        
+        self.jupiter.displays = self.jupiter.get_displays()
+
+        # Menu Info
+        threading.Thread(target=self.update_menu_info, args=[]).start()
+        
+        # Performance Menu
+        threading.Thread(target=self.update_performance_menu, args=[performances]).start()
+        
+        # Devices menu
+        threading.Thread(target=self.update_devices_menu, args=[devices]).start()
+        
+        # Screen resolutions
+        threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
+        
+        # Screen orientations
+        threading.Thread(target=self.update_screen_orientations, args=[orientations]).start()
+        # Primary Display
+        threading.Thread(target=self.update_primary, args=[primary]).start()
+       
+        # Video Displays
+        threading.Thread(target=self.update_video_displays, args=[displays]).start()
+        image = gtk.MenuItem("About")
+        image.connect("activate", self.about_dialog)
+        image.show()
+        self.menu.append(image)
+        image = gtk.MenuItem("Quit")
+        image.connect("activate", self.quit)
+        image.show()
+        self.menu.append(image)
+        time.sleep(1)            
+        self.menu.show()
+        if loaded_indicator:
+            self.ind.set_menu(self.menu)
+        else:
+            self.tray.connect('popup-menu', self.right_click_event)
+            self.tray.connect('activate', self.left_click_event)
+            #self.tray.set_tooltip(APP_TITLE + ': ' + APP_DESCRIPTION)
+        
+        # Set the timer callback
+        #new: timeout increased to 10 seconds
+        #gobject.timeout_add_seconds(10, self.elapsed_time)
+
+    def update_data(self):
+	"""get new data from xrandr library (case sth. changed during usage)"""
+        self.jupiter.screen= xrand.get_current_screen()
+        self.jupiter.monitors=self.jupiter.screen.crtcs
+        self.jupiter.outputs= self.jupiter.screen.get_outputs()
+        primary=None
+        secondary=None
+        for op in self.jupiter.outputs:
+            self.jupiter.features.get(op.name)['output']=op
+            rotation=op.get_crtcs()[0]._info.contents.rotation
+            if rotation >8 or rotation <1:
+		# bit comparison of rotation is necessary if it is not in wanted area
+                rotation=rotation & 0xf
+            op._rotation=rotation
+            print "Updated rotation= " + str(op._rotation)
+            if self.jupiter.features.get(op.name).get('primary')==True:
+                primary=op
+            elif self.jupiter.features.get(op.name).get('output').is_connected():
+                secondary=op
+        self.jupiter.currentRelation=self.jupiter.find_position(primary,secondary)
+        self.update_screen_menus()
+
+    def update_icon(self):
+	"""Updates the app-icon to indicate whether or not powersave mode is on or off"""                           
+        m = self.jupiter.get_current_cpu_mode()      
+                                                     
+        if m == 'powersave':                       
+            if loaded_indicator:                     
+                self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
+                self.ind.set_icon('preferences-desktop-screensaver')           
+            else:                                    
+                self.tray.set_from_icon_name("preferences-desktop-screensaver")
+        else:                                        
+            if loaded_indicator:                     
+                self.ind.set_icon_theme_path('/usr/share/icons/elementary-xfce/apps/16/')
+                self.ind.set_icon('xfce4-splash')
+            else:                                    
+                self.tray.set_from_icon_name('xfce4-splash')
+    
+    def right_click_event(self, icon, button, time):
+        self.menu.popup(None, None, gtk.status_icon_position_menu, button, time, self.tray)
+    
+    def left_click_event(self, data):
+        print lalala
+        self.menu.popup(None, None, gtk.status_icon_position_menu, 1, gtk.get_current_event_time(), self.tray)
+   
+    def update_screen_menus(self):
+	""" Updates screen menu in cased data is updated (external things happend)"""
+        # screen menu
+        self.menu.remove(self.menu.get_children()[6])
+        resolutions = gtk.Menu()
+        res_item = gtk.MenuItem('Screen Resolutions')
+        res_item.set_submenu(resolutions)
+        res_item.show()
+        self.menu.insert(res_item,6)
+        self.update_screen_resolutions(resolutions)
+        # rotate menu
+        self.menu.remove(self.menu.get_children()[7])
+        orientations = gtk.Menu()
+        ort_item = gtk.MenuItem('Screen Orientation')
+        ort_item.set_submenu(orientations)
+        ort_item.show()
+        self.menu.insert(ort_item,7)
+        self.update_screen_orientations(orientations)
+        # primary menu
+        self.menu.remove(self.menu.get_children()[8])
+        primary = gtk.Menu()
+        prim_item = gtk.MenuItem('Primary Display')
+        prim_item.set_submenu(primary)
+        prim_item.show()
+        self.menu.insert(prim_item,8)
+        self.update_primary(primary)
+        # video menu
+        self.menu.remove(self.menu.get_children()[9])
+        displays = gtk.Menu()
+        disp_item = gtk.MenuItem('Video Displays')
+        disp_item.set_submenu(displays)
+        disp_item.show()
+        self.menu.insert(disp_item,9)
+        threading.Thread(target=self.update_video_displays, args=[displays]).start()
+	# Necessary because else the menu cannot build up completely. UGLY AS SHIT THOUGH
+        time.sleep(1)
+
+    def update_video_displays(self, displays):
+	""" Updates video display menu after a change happend"""
+        #new!
+        primary=None
+        secondary=None
+        for entry in self.jupiter.features.keys():
+            print 'entry ' + entry
+            print self.jupiter.features.get(entry).get('primary')
+            if self.jupiter.features.get(entry).get('primary')==True:
+                primary=self.jupiter.features.get(entry).get('monitorname')
+            else:
+                if self.jupiter.features.get(entry).get('output').is_connected():
+                    secondary=self.jupiter.features.get(entry).get('monitorname')
+        videos = [ [primary +' only',5], [secondary+' only',6], ['Both: cloned ',xrand.RELATION_SAME_AS], ['Both: ' + primary + ' left',xrand.RELATION_LEFT_OF],  ['Both: ' +primary+ ' right',xrand.RELATION_RIGHT_OF] , ['Both: '+primary +' top',xrand.RELATION_ABOVE] , ['Both: '+ primary+' bottom',xrand.RELATION_BELOW]]
+        vgroup = gtk.RadioMenuItem()
+        mode = self.jupiter.currentRelation
+        for name,tag in videos:
+            item = gtk.RadioMenuItem(vgroup, name)
+            if mode == tag:
+                item.set_active(True)
+            item.connect("toggled", self.change_video_display, tag)
+            item.show()
+            displays.append(item)
+    
+    def update_screen_orientations(self,orientations):
+	""" Updates screen orientation in case changes are applied"""
+        #neu!
+        orient = { 'Normal' : xrand.RR_ROTATE_0, 'Left' : xrand.RR_ROTATE_90, 'Right' : xrand.RR_ROTATE_270, 'Upside Down' : xrand.RR_ROTATE_180 }
+        for output in self.jupiter.outputs:
+            if output.is_active():
+                rotation=output._rotation
+                oint = gtk.Menu()
+                oint_item = gtk.MenuItem(self.jupiter.features.get(output.name).get('monitorname'))
+                oint_item.set_submenu(oint)
+                oint_item.show()
+                ogroup = gtk.RadioMenuItem()
+                for name in orient.keys():
+                   item = gtk.RadioMenuItem(ogroup, name)
+                   if rotation == orient[name]:
+                      item.set_active(True)
+                   item.connect("toggled", self.change_orientation, orient[name],output.name)
+                   item.show()
+                   oint.append(item)
+                orientations.append(oint_item)
+   
+    def update_primary(self, primary):
+	""" Updates the primary menu in case changes are applied"""
+        primbut = gtk.RadioMenuItem()
+        for output in self.jupiter.outputs:
+            if output.is_active():
+                if output.name == "":
+                    continue
+                name=self.jupiter.features.get(output.name).get('monitorname')
+                item = gtk.RadioMenuItem(primbut, name)
+                if self.jupiter.features.get(output.name).get('primary'):
+                    item.set_active(True)
+                item.connect("toggled", self.change_primary, output.name)
+                item.show()
+                primary.append(item)
+    
+    def update_screen_resolutions(self,resolutions):
+	"""Updates screen resolution menu in case they changed and builds it"""
+        for output in self.jupiter.outputs:
+            if output.is_active():
+                res=output.get_available_modes()
+                dp = gtk.Menu()
+                dp_item = gtk.MenuItem(self.jupiter.features.get(output.name).get('monitorname'))
+                dp_item.set_submenu(dp)
+                dp_item.show()
+                rgroup = gtk.RadioMenuItem()
+                for entry in res:
+		    # calculation of refresh rate. 
+                    refreshRate= entry.dotClock/(entry.hTotal*entry.vTotal)
+                    item = gtk.RadioMenuItem(rgroup, entry.name + " @ " + str(refreshRate))
+                    if entry.id == output._mode:
+                        item.set_active(True)
+                    item.connect("toggled", self.change_resolution, entry.name,output.name)
+                    item.show()
+                    dp.append(item)
+                resolutions.append(dp_item)
+ 
+    def update_devices_menu(self, devices):
+        if self.jupiter.wifi != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Wifi")
+            if self.jupiter.switch_state(self.jupiter.wifi):
+                check.set_active(True)
+                check.set_label('Disable Wifi')
+            check.connect("toggled", self.switch_device, 'wifi')
+            check.show()
+            devices.append(check)
+        
+        if self.jupiter.touchpad != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Touchpad")
+            if self.jupiter.switch_state(self.jupiter.touchpad):
+                check.set_active(True)
+                check.set_label('Disable Touchpad')
+            check.connect("toggled", self.switch_device, 'touchpad')
+            check.show()
+            devices.append(check)
+        
+        if self.jupiter.bluetooth != 'UNKNOWN':
+            check = gtk.CheckMenuItem("Enable Bluetooth")
+            if self.jupiter.switch_state(self.jupiter.bluetooth):
+                check.set_active(True)
+                check.set_label('Disable Bluetooth')
+            check.connect("toggled", self.switch_device, 'bluetooth')
+            check.show()
+            devices.append(check)
+    
+    def update_performance_menu(self, performances):
+	""" Builds and updates performance menu in case of changes"""
+        mode = self.jupiter.powersave
+        radio = gtk.RadioMenuItem()
+        
+        item = gtk.RadioMenuItem(radio, "Power On Demand")
+        if mode == False:
+            item.set_active(True)
+        item.connect("toggled", self.toggle_performance, False)
+        item.show()
+        performances.append(item)
+        
+        item = gtk.RadioMenuItem(radio, "Power Saving")
+        if mode == True:
+            item.set_active(True)
+        item.connect("toggled", self.toggle_performance, True)
+        item.show()
+        performances.append(item)
+
+        self.cpu_mode = mode
+  
+    def update_menu_info(self):
+        msg = 'CPU Mode: ' + self.jupiter.get_cpu_mode_name()
+        self.current_temp = self.jupiter.get_temperature()
+        if self.current_temp != "0 ºC":
+            msg += '\nTemperature: ' + self.jupiter.get_temperature()
+        info = gtk.MenuItem(msg)
+        info.show()
+        info.set_sensitive(False)
+        self.menu.insert(info, 0)
+        
+    def elapsed_time(self):
+        msg = 'CPU Mode: ' + self.jupiter.get_cpu_mode_name()
+        self.current_temp = self.jupiter.get_temperature()
+        if self.current_temp != "0 ºC":
+            msg += '\nTemperature: ' + self.jupiter.get_temperature()
+
+        self.menu.get_children()[0].set_label(msg)
+
+        self.menu.get_children()[0].set_label(msg)
+        if self.jupiter.get_current_cpu_mode() != self.cpu_mode:
+            self.update_icon()
+            perfs = self.menu.get_children()[2].get_submenu()
+
+            for i in perfs.get_children():
+                perfs.remove(i)
+
+            self.update_performance_menu(perfs)
+            self.cpu_mode = self.jupiter.get_current_cpu_mode()
+
+        # get changed displays  
+        check = self.jupiter.get_displays()
+        # if the displays changed, update menus.
+        if check != self.jupiter.displays:
+            self.jupiter.displays = check
+            self.update_screen_menus()
+        return True
+    
+    def quit(self, widget, data=None):
+        gtk.main_quit()
+    
+    def toggle_performance(self, widget, powersave=None):
+	"""Change powersave settings"""
+        if powersave != None:
+            if widget.active:
+                if not self.jupiter.is_cpu_mode(powersave):
+                    #try:
+                    #geht nur mit adminrechten!!!!
+                    #subprocess.check_call(["pm-powersave",str(powersave).lower()])
+                    self.jupiter.powersave=powersave
+                    if powersave == False:
+                        if loaded_indicator:
+                            self.ind.set_icon_theme_path('/usr/share/icons/elementary-xfce/apps/16/')
+                            self.ind.set_icon('xfce4-splash')
+                        else:
+                            self.tray.set_from_icon_name('xfce4-splash')
+                    elif powersave == True:
+                        if loaded_indicator:
+                            self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
+                            self.ind.set_icon('preferences-desktop-screensaver')
+                        else:
+                            self.tray.set_from_icon_name("preference-desktop-screensaver")
+                    #except:
+            #print "Power change failed."
+            #if loaded_indicator:
+                        #    self.ind.set_icon('bolt3')
+                        #else:
+                        #    self.tray.set_from_icon_name('bolt3')
+    
+    def switch_device(self, widget, data=None):
+        if data != None:
+            self.jupiter.exec_command(data, 'toggle')
+            state = self.jupiter.check_state('/' + data)
+            if self.jupiter.switch_state(state) == True:
+                widget.set_label('Disable ' + string.capwords(data))
+            elif self.jupiter.switch_state(state) == False:
+                widget.set_label('Enable ' + string.capwords(data))
+    
+    def _apply_output_cfg(self):
+	"""Applies changes to outputs and crtcs"""
+        before.write("BEFORE CHANGE")
+        before.write(repr(self.jupiter))
+        self.jupiter.screen.apply_output_config()
+        after.write("AFTER CHANGE")
+        after.write(repr(self.jupiter))
+        before.flush()
+        after.flush()
+        self.update_data()
+
+    def set_resolution (self,mode,change_output,relation_output):
+	"""Calling function to change resolution"""
+        change_output.set_to_mode(mode)
+        relation=self.jupiter.find_position(change_output,relation_output)
+        change_output.set_relation(relation_output.name,relation)
+        self._apply_output_cfg()
+        self.jupiter.save_pref_res()
+
+    def change_resolution(self,widget,resolution,outputname):
+	"""Changes the resolution of an output."""
+        #new! works, aber sieht sehr unschoen aus...
+        if resolution != None:
+            if widget.active:
+                mode = None
+                related_output=None
+                output=None
+                for op in self.jupiter.outputs:
+                    if op.name==outputname:
+                        output=op
+                for i in range(0,len(output.get_available_modes())):
+                    if output.get_available_modes()[i].name==resolution:
+                        mode=i
+                        break
+                for op in self.jupiter.outputs:
+                    if op!=output and op.is_active():
+                        related_output=op
+                        break
+                if mode!=None:
+                    self.set_resolution(mode,output,related_output)
+                    self.jupiter.currentMode=mode
+
+    def change_current_relation(self):
+	""" In case of relation not from primary point of view, relation has to be adjusted"""
+        if self.jupiter.currentRelation==0:
+            self.jupiter.currentRelation=1
+        elif self.jupiter.currentRelation==1:
+            self.jupiter.currentRelation=0
+        elif self.jupiter.currentRelation==2:
+            self.jupiter.currentRelation=3
+        elif self.jupiter.currentRelation==3:
+            self.jupiter.currentRelation=2
+
+    def change_primary(self, widget, outputname):
+	"""Changes the primary monitor"""
+        if outputname != None:
+            if widget.active:
+                self.jupiter.features.get(self.jupiter.primary)['primary']=False
+                self.jupiter.primary=outputname
+                self.jupiter.features.get(outputname)['primary']=True
+                self.change_current_relation()
+                self.update_screen_menus()
+                self.jupiter.save_pref_res()
+
+    def rotate_output(self,outputname,rotation):
+	""" Rotates an output """
+        relation_output=None
+        output=None
+        for op in self.jupiter.outputs:
+            if op.name!=outputname and op.is_active():
+                relation_output=op
+            elif op.name==outputname and op.is_active():
+                output=op
+        relation=self.jupiter.find_position(output,relation_output)
+        output.set_relation(relation_output.name,relation)
+        output._rotation=rotation
+        self._apply_output_cfg()
+        self.jupiter.save_pref_res()
+    
+
+    def change_orientation(self, widget, rotation=None,outputname=None):
+        if rotation != None:
+            if widget.active:
+                self.rotate_output(outputname,rotation) 
+    
+    def about_dialog(self, widget, data=None):
+        dialog = JupiterAboutDialog()
+        dialog.run()
+        dialog.destroy()
+
+    def switch_displays(self,relation):
+	"""Switches displays"""
+        primary_OP=None
+        secondary_OP=None
+        for output in self.jupiter.outputs:
+            if self.jupiter.features.get(output.name).get('primary') and output.is_connected():
+                primary_OP=output
+            elif not self.jupiter.features.get(output.name).get('primary') and output.is_connected():
+                secondary_OP=output
+        if secondary_OP==None:
+            return
+        if relation ==5:
+            print 'disable secondary op '
+            secondary_OP.disable()
+	    #test whether or not adjusting of mm_height & width works -> didnt
+            #if self.jupiter.currentRelation==xrand.RELATION_BELOW or self.jupiter.currentRelation==xrand.RELATION_ABOVE:
+            #self.jupiter.screen._height=self.jupiter.screen._height-secondary_OP.get_crtcs()[0]._info.contents.height
+            #self.jupiter.screen.set_size(self.jupiter.screen._width,self.jupiter.screen._height,self.jupiter.screen._width_mm,self.jupiter.screen._height_mm)
+            #elif self.jupiter.currentRelation==xrand.RELATION_LEFT_OF or self.jupiter.currentRelation==xrand.RELATION_RIGHT_OF:
+            #self.jupiter.screen._width=self.jupiter.screen._width-secondary_OP.get_crtcs()[0]._info.contents.width
+            #self.jupiter.screen.set_size(self.jupiter.screen._width,self.jupiter.screen._height,self.jupiter.screen._width_mm,self.jupiter.screen._height_mm)
+        elif relation==6:
+            print 'disable primary OP'
+            primary_OP.disable()
+        elif relation==-1:
+            print "dont want to be managed anymore"
+        else:
+            active_outputs=[]
+            for out in self.jupiter.outputs:
+                if out.is_active():
+                    print out.name
+                    active_outputs.append(out)
+            if len(active_outputs)>1:
+                if relation==xrand.RELATION_SAME_AS:
+                    max_res_one=-1
+                    max_res_two=-1
+                    endloop=False
+                    for x in range(0, len(active_outputs)-1):
+                        if (x+1) >= len(active_outputs) or endloop==True:
+                            break
+                        for y in range(0,len(active_outputs[x].get_available_modes())):
+                            if endloop==True:
+                                break
+                            for z in range(0,len(active_outputs[x+1].get_available_modes())):
+                                if active_outputs[x].get_available_modes()[y].name==active_outputs[x+1].get_available_modes()[z].name:
+                                    max_res_one=y
+                                    max_res_two=z
+                                    endloop=True
+                                if endloop==True:
+                                    break
+                    primary_OP.set_to_mode(max_res_one)
+                    secondary_OP.set_to_mode(max_res_two)
+                    primary_OP.set_relation(secondary_OP.name,relation)
+                else:
+                # hier muss man nochmal gucken: flag ob er aus cloned kommt -> dann ja, ansonsten aufloesungen so lassen
+                    primary_OP.set_to_mode(0)
+                    secondary_OP.set_to_mode(0)
+                    primary_OP.set_relation(secondary_OP.name,relation)
+            else:
+                inactive_output=None
+                for op in self.jupiter.outputs:
+                    if not op.is_active() and op.is_connected():
+                        inactive_output=op
+                print inactive_output.name
+                if inactive_output==None:
+                    return
+                inactive_output.set_to_preferred_mode()
+                inactive_output.get_crtcs()[0].add_output(inactive_output)
+                if relation==xrand.RELATION_SAME_AS:
+                    print "wuff"
+                else:
+                    if primary_OP.name==inactive_output.name:
+                        inactive_output.set_relation(secondary_OP.name,relation)
+                    else:
+                        if relation==xrand.RELATION_BELOW or relation==xrand.RELATION_LEFT_OF:
+                            inactive_output.set_relation(primary_OP.name,relation-1)
+                        else:
+                            inactive_output.set_relation(primary_OP.name,relation+1)
+                inactive_output.get_crtcs()[0]._info.contents.noutput=1        
+        self.jupiter.currentRelation=relation
+        self._apply_output_cfg()
+        self.jupiter.save_pref_res()
+
+    def change_video_display(self, widget, relation=None):
+	"""Calls for update screen resolutions"""
+        if relation != None:
+            if widget.active:
+            #if not self.jupiter.is_current_display(data):
+                self.switch_displays(relation)
+                resolutions = gtk.Menu()
+                self.menu.get_children()[6].set_submenu(resolutions)
+                threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
+
+class JupiterAboutDialog(gtk.AboutDialog):
+    """ Class to handle the About Dialog of Jupiter """
+    
+    def __init__(self):
+        gtk.AboutDialog.__init__(self)
+        self.set_program_name(APP_TITLE)
+        self.set_version(APP_VERSION)
+        self.set_copyright(APP_COPYRIGHT)
+        self.set_comments(APP_DESCRIPTION)
+        
+        logo = gtk.icon_theme_get_default().load_icon('jupiter', 64, 0)
+        self.set_logo(logo)
+        self.set_website('http://www.jupiterapplet.org')
+        self.set_website_label('Homepage')
+    
+def main():
+    gtk.main()
+    return 0
+
+if __name__ == "__main__":
+    indicator = JupiterIndicator()
+    main()

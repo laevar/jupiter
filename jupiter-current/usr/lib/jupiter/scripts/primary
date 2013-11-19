@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# set primary 
+# Jochen Schulz
+# Tool to set primary display 
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+NICON="/usr/share/pixmaps/display.png"
+. $JUPITER_PATH/common
+
+if [ -e "$JUPITER_VAR/primary_saved" ]; then
+  PRIM_RESTORE=$(cat $JUPITER_VAR/primary_saved)
+fi
+
+. $JUPITER_PATH/devices
+
+if [ ! "$2" ]; then
+  VIDEO_DEVICE=$FIRST_DEVICE
+else
+  VIDEO_DEVICE="$2"
+fi
+VIDEO_STATUS=$(echo "$VGA_XRANDR" | grep "$VIDEO_DEVICE.* connected" >/dev/null 2>&1 && echo connected)
+
+
+function prim {
+  if [ ! "$VIDEO_STATUS" = "connected" ]; then
+      notify $"Monitor $VIDEO_DEVICE not connected." $NICON
+      exit 0
+  fi
+  xrandr --output $VIDEO_DEVICE --primary
+  if [ "$?" = "0" ]; then
+    notify $"Display $VIDEO_DEVICE primary" $NICON
+    echo $VIDEO_DEVICE > $JUPITER_VAR/primary_saved
+  else
+    notify $"Could not set $VIDEO_DEVICE primary." $NICON
+  fi
+  exit 0
+}
+
+case $1 in
+  restore)
+    NO_NOTIFY=1
+    prim $PRIM_RESTORE
+  ;;
+  default)
+    prim $VIDEO_DEVICE
+  ;; 
+  *)
+    prim $VIDEO_DEVICE
+  ;;
+esac

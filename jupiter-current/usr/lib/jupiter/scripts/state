@@ -1,0 +1,28 @@
+#!/bin/bash
+# 
+# Reports current CPU state
+#
+
+JUPITER_PATH="/usr/lib/jupiter/scripts"
+JUPITER_KERNEL="/usr/lib/jupiter/kernel"
+JUPITER_VAR="/var/jupiter"
+
+AC_DEVICE=$(ls /sys/class/power_supply | grep "ADP\|AC")
+ACPI_AC_PROC=/sys/class/power_supply/$AC_DEVICE/online
+
+function report_mode {
+    if [ -e "$ACPI_AC_PROC" ]; then
+      if [ "$(cat $ACPI_AC_PROC)" = "1" ]; then
+        echo power
+      else
+        echo battery
+      fi
+    else
+      echo UNKNOWN
+    fi
+}
+
+case "$1" in
+  *) report_mode
+  ;;
+esac
