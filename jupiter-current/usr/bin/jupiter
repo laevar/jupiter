@@ -69,7 +69,7 @@ class Jupiter:
         self.bluetooth = self.check_state('/bluetooth')
         self.wifi = self.check_state('/wifi')
         self.touchpad = self.check_state('/touchpad')
-        self.vendor = self.get_vendor()
+        #self.vendor = self.get_vendor()
         self.primary=''
         self.video_modes = False
 	# getting data from xrandr library
