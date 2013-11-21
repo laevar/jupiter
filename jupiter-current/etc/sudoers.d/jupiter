@@ -1,1 +1,1 @@
-%jupiter ALL=NOPASSWD: /usr/lib/jupiter/scripts/bluetooth, /usr/lib/jupiter/scripts/camera, /usr/lib/jupiter/scripts/wifi
+%jupiter ALL=NOPASSWD: /usr/lib/jupiter/scripts/bluetooth, /usr/lib/jupiter/scripts/camera, /usr/lib/jupiter/scripts/wifi, /usr/sbin/pm-powersave
