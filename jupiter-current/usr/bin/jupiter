@@ -29,7 +29,6 @@ import os
 import glob 
 pygtk.require('2.0')
 import gtk, gobject
-import subprocess
 import re
 import time
 import string
@@ -908,6 +907,10 @@ class JupiterIndicator:
             self.jupiter.currentRelation=3
         elif self.jupiter.currentRelation==3:
             self.jupiter.currentRelation=2
+        elif self.jupiter.currentRelation==5:
+            self.jupiter.currentRelation=6
+        elif self.jupiter.currentRelation==6:
+            self.jupiter.currentRelation=5
 
     def change_primary(self, widget, outputname):
 	"""Changes the primary monitor"""
@@ -919,6 +922,16 @@ class JupiterIndicator:
                 self.change_current_relation()
                 self.update_screen_menus()
                 self.jupiter.save_pref_res()
+    
+    def exchange_monitors (self,outputname):
+        self.jupiter.features.get(self.jupiter.primary)['primary']=False
+        self.jupiter.primary=outputname
+        self.jupiter.features.get(outputname)['primary']=True
+        self.change_current_relation()
+        self.update_screen_menus()
+        self.update_data()
+        self.jupiter.save_pref_res()
+
 
     def rotate_output(self,outputname,rotation):
 	""" Rotates an output """
@@ -959,7 +972,12 @@ class JupiterIndicator:
             return
         if relation ==5:
             print 'disable secondary op '
-            secondary_OP.disable()
+            #secondary_OP.disable()
+            subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
+            self.jupiter.currentRelation=relation
+            self.update_data()
+            self.jupiter.save_pref_res()
+            return
 	    #test whether or not adjusting of mm_height & width works -> didnt
             #if self.jupiter.currentRelation==xrand.RELATION_BELOW or self.jupiter.currentRelation==xrand.RELATION_ABOVE:
             #self.jupiter.screen._height=self.jupiter.screen._height-secondary_OP.get_crtcs()[0]._info.contents.height
@@ -969,7 +987,11 @@ class JupiterIndicator:
             #self.jupiter.screen.set_size(self.jupiter.screen._width,self.jupiter.screen._height,self.jupiter.screen._width_mm,self.jupiter.screen._height_mm)
         elif relation==6:
             print 'disable primary OP'
-            primary_OP.disable()
+            #primary_OP.disable()
+            subprocess.check_call(["xrandr","--output",primary_OP.name,"--off"])
+            self.jupiter.currentRelation=relation
+            self.exchange_monitors(secondary_OP.name)
+            return
         elif relation==-1:
             print "dont want to be managed anymore"
         else:
@@ -1012,7 +1034,7 @@ class JupiterIndicator:
                 print inactive_output.name
                 if inactive_output==None:
                     return
-                inactive_output.set_to_preferred_mode()
+                inactive_output.set_to_mode(0)
                 inactive_output.get_crtcs()[0].add_output(inactive_output)
                 if relation==xrand.RELATION_SAME_AS:
                     print "wuff"
