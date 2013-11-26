@@ -35,6 +35,7 @@ import string
 import threading
 import xrandr.xrandr as xrand
 import subprocess
+import math
 from xrandr import edid1 as edid
 
 try:
@@ -73,6 +74,8 @@ class Jupiter:
         self.video_modes = False
 	# getting data from xrandr library
         self.screen = xrand.get_current_screen()
+        self.dpi=math.ceil(math.sqrt((self.screen._height*self.screen._width)/((self.screen._height_mm/10)*(self.screen._width_mm/10)/6.4514)))
+        print self.dpi
         self.monitors=self.screen.crtcs
         self.outputs = self.screen.get_outputs()
         self.features={}
@@ -97,14 +100,11 @@ class Jupiter:
                     monitorname=ediddata.get('monitor_name')
                 else:
                     monitorname=op.name
-                print monitorname
             except:
                 monitorname=op.name
-                print "asdf " + monitorname
             self.features[op.name]={'output':op,'edid':ediddata,'monitorname':monitorname,'identifier':identifier}
             if op.name=='LVDS1':
 		# if no saved data: Setting LVDS1 primary by default.
-                print 'weeeeeeeeeeeeeeeee' 
                 self.features.get(op.name)['primary']=True
                 try:
                     self.features.get(self.primary)['primary']=False
@@ -121,6 +121,7 @@ class Jupiter:
                     self.features.get(op.name)['primary']=False
                     secondary=op.name
             self.rotations.append(op._rotation)
+        subprocess.check_call(["xrandr","--output",self.primary,"--primary"])
         self.currentMode=0
 	# find current position of monitors
         self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
@@ -400,6 +401,7 @@ class Jupiter:
                                 self.features.get(self.primary)['primary']=False
                                 self.features.get(outname)['primary']=True
                                 self.primary=outname
+                                subprocess.check_call(["xrandr","--output",self.primary,"--primary"])
                         else:
                             self.features.get(outname)['primary']=False
                     elif "rotation" in line:
@@ -661,7 +663,7 @@ class JupiterIndicator:
             else:
                 if self.jupiter.features.get(entry).get('output').is_connected():
                     secondary=self.jupiter.features.get(entry).get('monitorname')
-        videos = [ [primary +' only',5], [secondary+' only',6], ['Both: cloned ',xrand.RELATION_SAME_AS], ['Both: ' + primary + ' left',xrand.RELATION_LEFT_OF],  ['Both: ' +primary+ ' right',xrand.RELATION_RIGHT_OF] , ['Both: '+primary +' top',xrand.RELATION_ABOVE] , ['Both: '+ primary+' bottom',xrand.RELATION_BELOW]]
+        videos = [ [primary +' only',5],[secondary + ' only',6], ['Both: cloned ',xrand.RELATION_SAME_AS], ['Both: ' + primary + ' left',xrand.RELATION_LEFT_OF],  ['Both: ' +primary+ ' right',xrand.RELATION_RIGHT_OF] , ['Both: '+primary +' top',xrand.RELATION_ABOVE] , ['Both: '+ primary+' bottom',xrand.RELATION_BELOW]]
         vgroup = gtk.RadioMenuItem()
         mode = self.jupiter.currentRelation
         for name,tag in videos:
@@ -862,7 +864,8 @@ class JupiterIndicator:
 	"""Calling function to change resolution"""
         change_output.set_to_mode(mode)
         relation=self.jupiter.find_position(change_output,relation_output)
-        change_output.set_relation(relation_output.name,relation)
+        if relation_output.is_active():
+           change_output.set_relation(relation_output.name,relation)
         self._apply_output_cfg()
         self.jupiter.save_pref_res()
 
@@ -883,6 +886,9 @@ class JupiterIndicator:
                         break
                 for op in self.jupiter.outputs:
                     if op!=output and op.is_active():
+                        related_output=op
+                        break
+                    elif op!=output and op.is_connected():
                         related_output=op
                         break
                 if mode!=None:
@@ -910,6 +916,7 @@ class JupiterIndicator:
             if widget.active:
                 self.jupiter.features.get(self.jupiter.primary)['primary']=False
                 self.jupiter.primary=outputname
+                subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
                 self.jupiter.features.get(outputname)['primary']=True
                 self.change_current_relation()
                 self.update_screen_menus()
@@ -919,6 +926,7 @@ class JupiterIndicator:
         self.jupiter.features.get(self.jupiter.primary)['primary']=False
         self.jupiter.primary=outputname
         self.jupiter.features.get(outputname)['primary']=True
+        subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
         self.update_data()
         self.change_current_relation()
         self.update_screen_menus()
@@ -951,6 +959,11 @@ class JupiterIndicator:
         dialog.run()
         dialog.destroy()
 
+    def get_current_mode(self,output):
+        for mode in output.get_available_modes():
+            if mode.id==output._mode:
+                return mode.name
+
     def switch_displays(self,relation):
 	"""Switches displays"""
         primary_OP=None
@@ -965,17 +978,18 @@ class JupiterIndicator:
         if relation ==5:
             print 'disable secondary op '
             #secondary_OP.disable()
-            print secondary_OP._rotation
+            before.write(repr(self.jupiter))
             subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
+            subprocess.check_call(["xrandr","--screen", "0","--size", self.get_current_mode(primary_OP),"--dpi", str(self.jupiter.dpi)])
             self.update_data()
             self.jupiter.currentRelation=6
             self.jupiter.save_pref_res()
             return
         elif relation==6:
             print 'disable primary OP'
-            print primary_OP._rotation
-            #primary_OP.disable()
+            primary_OP.disable()
             subprocess.check_call(["xrandr","--output",primary_OP.name,"--off"])
+            subprocess.check_call(["xrandr","--screen", "0","--size", self.get_current_mode(secondary_OP), "--dpi",str(self.jupiter.dpi)])
             self.jupiter.currentRelation=relation
             self.exchange_monitors(secondary_OP.name)
             return
@@ -985,7 +999,6 @@ class JupiterIndicator:
             active_outputs=[]
             for out in self.jupiter.outputs:
                 if out.is_active():
-                    print out.name
                     active_outputs.append(out)
             if len(active_outputs)>1:
                 if relation==xrand.RELATION_SAME_AS:
@@ -1018,7 +1031,6 @@ class JupiterIndicator:
                 for op in self.jupiter.outputs:
                     if not op.is_active() and op.is_connected():
                         inactive_output=op
-                print inactive_output.name
                 if inactive_output==None:
                     return
                 inactive_output.set_to_mode(0)
