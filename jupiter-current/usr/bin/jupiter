@@ -87,14 +87,11 @@ class Jupiter:
             monitorname=""
             identifier=""
             if ediddata!=None:
-                print ediddata
                 if ediddata.get('serial_32') != None and ediddata.get('serial_32') !=0:
 		    # arrange individual identifier from edid parsing
                     identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("serial_32"))
-                    print identifier
                 else:
                     identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("product_id"))
-                    print identifier
             try:
                 if ediddata.get('monitor_name')!=None:
                     monitorname=ediddata.get('monitor_name')
@@ -110,7 +107,6 @@ class Jupiter:
                     self.features.get(self.primary)['primary']=False
                     secondary=self.primary
                 except:
-                    print 'not yet entered a primary'
                 self.primary=op.name
             else:
 		# if no LVDS1 available, randomly choose primary if no saved data
@@ -338,7 +334,6 @@ class Jupiter:
             if monitor.get_outputs()[0].name==change_output.name:
                 change_x=monitor._info.contents.x
                 change_y=monitor._info.contents.y
-                print "change x change y " + str(change_x) + " " + str(change_y)
             else:
                 relation_x=monitor._info.contents.x
                 relation_y=monitor._info.contents.y
@@ -358,9 +353,7 @@ class Jupiter:
     def save_pref_res(self):
 	""" Saves the current preferred settings"""
 	# filename consists of unique identifier got by edid parsing
-        print self.create_filename()
         fo = open(self.create_filename(),"w")
-        print 'save ' + self.create_filename()
         for x in range(0,len(self.outputs)):
             if self.outputs[x].is_active():
                 fo.write("["+self.outputs[x].name + "]\n")
@@ -386,7 +379,6 @@ class Jupiter:
             for line in fo:
                 if line.startswith("["):
                     outname=line.replace("[","").replace("]","").replace("\n","")
-                    print outname
                 elif line.startswith("!"):
                     ps=line.split("=")[1].replace("\n","")
                     if ps=="True":
@@ -581,7 +573,6 @@ class JupiterIndicator:
 		# bit comparison of rotation is necessary if it is not in wanted area
                 rotation=rotation & 0xf
             op._rotation=rotation
-            print "Updated rotation= " + str(op._rotation)
             if self.jupiter.features.get(op.name).get('primary')==True:
                 primary=op
             elif self.jupiter.features.get(op.name).get('output').is_connected():
@@ -612,7 +603,6 @@ class JupiterIndicator:
         self.menu.popup(None, None, gtk.status_icon_position_menu, button, time, self.tray)
     
     def left_click_event(self, data):
-        print lalala
         self.menu.popup(None, None, gtk.status_icon_position_menu, 1, gtk.get_current_event_time(), self.tray)
    
     def update_screen_menus(self):
@@ -658,8 +648,6 @@ class JupiterIndicator:
         primary=None
         secondary=None
         for entry in self.jupiter.features.keys():
-            print 'entry ' + entry
-            print self.jupiter.features.get(entry).get('primary')
             if self.jupiter.features.get(entry).get('primary')==True:
                 primary=self.jupiter.features.get(entry).get('monitorname')
             else:
@@ -982,8 +970,6 @@ class JupiterIndicator:
             if out.is_active():
                 active_outputs.append(out)
         if relation ==5:
-            print 'disable secondary op '
-            #secondary_OP.disable()
             before.write(repr(self.jupiter))
             subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
             subprocess.check_call(["xrandr","--screen", "0","--size", self.get_current_mode(primary_OP),"--dpi", str(self.jupiter.dpi)])
@@ -992,7 +978,6 @@ class JupiterIndicator:
             self.jupiter.save_pref_res()
             return
         elif relation==6:
-            print 'disable primary OP'
             if len(active_outputs)==1:
                 # switch on other monitor when only one ia active
                 secondary_OP.set_to_mode(0)
