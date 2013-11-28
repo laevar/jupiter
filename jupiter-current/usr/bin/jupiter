@@ -200,7 +200,6 @@ class Jupiter:
                 cmd += [self.path + command] + args
             else:
                 cmd += [self.path + command, args]
-            # data = subprocess.check_output(cmd, shell=False, stderr=fh).replace('\n','')
             # FIX for python 2.6, backward compatibility
             return subprocess.Popen(cmd, shell=False, stderr=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].replace('\n','')
         except Exception, ex:
