@@ -567,7 +567,7 @@ class JupiterIndicator:
         #new: timeout increased to 10 seconds
         #gobject.timeout_add_seconds(10, self.elapsed_time)
 
-    def update_data(self):
+    def update_data(self,relation=None):
 	"""get new data from xrandr library (case sth. changed during usage)"""
         self.jupiter.screen= xrand.get_current_screen()
         self.jupiter.monitors=self.jupiter.screen.crtcs
@@ -587,6 +587,8 @@ class JupiterIndicator:
             elif self.jupiter.features.get(op.name).get('output').is_connected():
                 secondary=op
         self.jupiter.currentRelation=self.jupiter.find_position(primary,secondary)
+        if relation != None:
+            self.jupiter.currentRelation=relation
         self.update_screen_menus()
 
     def update_icon(self):
@@ -975,19 +977,28 @@ class JupiterIndicator:
                 secondary_OP=output
         if secondary_OP==None:
             return
+        active_outputs=[]
+        for out in self.jupiter.outputs:
+            if out.is_active():
+                active_outputs.append(out)
         if relation ==5:
             print 'disable secondary op '
             #secondary_OP.disable()
             before.write(repr(self.jupiter))
             subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
             subprocess.check_call(["xrandr","--screen", "0","--size", self.get_current_mode(primary_OP),"--dpi", str(self.jupiter.dpi)])
-            self.update_data()
-            self.jupiter.currentRelation=6
+            self.jupiter.currentRelation=relation
+            self.update_data(relation)
             self.jupiter.save_pref_res()
             return
         elif relation==6:
             print 'disable primary OP'
-            primary_OP.disable()
+            if len(active_outputs)==1:
+                # switch on other monitor when only one ia active
+                secondary_OP.set_to_mode(0)
+                secondary_OP.set_relation(primary_OP.name,xrand.RELATION_BELOW)
+                self._apply_output_cfg()
+            #momentary bug fixes to ensure the functionality of switching on and off    
             subprocess.check_call(["xrandr","--output",primary_OP.name,"--off"])
             subprocess.check_call(["xrandr","--screen", "0","--size", self.get_current_mode(secondary_OP), "--dpi",str(self.jupiter.dpi)])
             self.jupiter.currentRelation=relation
@@ -996,10 +1007,6 @@ class JupiterIndicator:
         elif relation==-1:
             print "dont want to be managed anymore"
         else:
-            active_outputs=[]
-            for out in self.jupiter.outputs:
-                if out.is_active():
-                    active_outputs.append(out)
             if len(active_outputs)>1:
                 if relation==xrand.RELATION_SAME_AS:
                     max_res_one=-1
@@ -1079,9 +1086,9 @@ class JupiterIndicator:
             if widget.active:
             #if not self.jupiter.is_current_display(data):
                 self.switch_displays(relation)
-                resolutions = gtk.Menu()
-                self.menu.get_children()[6].set_submenu(resolutions)
-                threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
+                #resolutions = gtk.Menu()
+                #self.menu.get_children()[6].set_submenu(resolutions)
+                #threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
 
 class JupiterAboutDialog(gtk.AboutDialog):
     """ Class to handle the About Dialog of Jupiter """
