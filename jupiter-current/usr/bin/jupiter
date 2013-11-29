@@ -107,7 +107,7 @@ class Jupiter:
                     self.features.get(self.primary)['primary']=False
                     secondary=self.primary
                 except:
-                self.primary=op.name
+                    self.primary=op.name
             else:
 		# if no LVDS1 available, randomly choose primary if no saved data
                 if self.primary=='':
