@@ -956,6 +956,9 @@ def get_screen_of_display(display, count):
     dpy = xlib.XOpenDisplay(display)
     return Screen(dpy, count)
 
+def get_screen_old_display(dpy):
+    return Screen(dpy)
+
 def get_version():
     """Returns a tuple containing the major and minor version of the xrandr
        extension or None if the extension is not available"""

@@ -73,6 +73,7 @@ class Jupiter:
         self.primary=''
         self.video_modes = False
 	# getting data from xrandr library
+        self.dpy=xrand.get_current_display()
         self.screen = xrand.get_current_screen()
         self.dpi=math.ceil(math.sqrt((self.screen._height*self.screen._width)/((self.screen._height_mm/10.0)*(self.screen._width_mm/10.0)/6.4514)))
         print self.dpi
@@ -488,7 +489,7 @@ class Jupiter:
 
     def update_data(self,relation=None):
 	"""get new data from xrandr library (case sth. changed during usage)"""
-        self.screen= xrand.get_current_screen()
+        self.screen= xrand.get_screen_old_display(self.dpy)
         self.monitors=self.screen.crtcs
         self.outputs= self.screen.get_outputs()
         primary=None
@@ -627,7 +628,7 @@ class JupiterIndicator:
 
     def query_update(self):
         print "lol"
-        screen= xrand.get_current_screen()
+        screen= xrand.get_screen_old_display(self.jupiter.dpy)
         monitors=screen.crtcs
         outputs= screen.get_outputs()
         connected_ops=0
@@ -690,7 +691,10 @@ class JupiterIndicator:
             subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
             self.jupiter.currentMode=0
 	# find current position of monitors
-            self.jupiter.currentRelation=self.jupiter.find_position(self.jupiter.features.get(self.jupiter.primary).get('output'),self.jupiter.features.get(secondary).get('output'))
+            try:
+                self.jupiter.currentRelation=self.jupiter.find_position(self.jupiter.features.get(self.jupiter.primary).get('output'),self.jupiter.features.get(secondary).get('output'))
+            except:
+                self.jupiter.currentRelation=5
             self.jupiter.load_pref_res()
             self.update_screen_menus()
             time.sleep(2)
@@ -698,7 +702,7 @@ class JupiterIndicator:
 
     def update_data(self,relation=None):
 	"""get new data from xrandr library (case sth. changed during usage)"""
-        self.jupiter.screen= xrand.get_current_screen()
+        self.jupiter.screen= xrand.get_screen_old_display(self.jupiter.dpy)
         self.jupiter.monitors=self.jupiter.screen.crtcs
         self.jupiter.outputs= self.jupiter.screen.get_outputs()
         primary=None
@@ -814,6 +818,8 @@ class JupiterIndicator:
         for output in self.jupiter.outputs:
             if output.is_active():
                 rotation=output._rotation
+                if output.name == "" or self.jupiter.features.get(output.name).get('monitorname')=='':
+                    continue
                 oint = gtk.Menu()
                 oint_item = gtk.MenuItem(self.jupiter.features.get(output.name).get('monitorname'))
                 oint_item.set_submenu(oint)
@@ -833,7 +839,7 @@ class JupiterIndicator:
         primbut = gtk.RadioMenuItem()
         for output in self.jupiter.outputs:
             if output.is_active():
-                if output.name == "":
+                if output.name == "" or self.jupiter.features.get(output.name).get('monitorname')=='':
                     continue
                 name=self.jupiter.features.get(output.name).get('monitorname')
                 item = gtk.RadioMenuItem(primbut, name)
@@ -848,6 +854,8 @@ class JupiterIndicator:
         for output in self.jupiter.outputs:
             if output.is_active():
                 res=output.get_available_modes()
+                if output.name == "" or self.jupiter.features.get(output.name).get('monitorname')=='':
+                    continue
                 dp = gtk.Menu()
                 print output.name
                 print self.jupiter.connected_ops
