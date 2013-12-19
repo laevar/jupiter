@@ -280,6 +280,11 @@ class Output:
         """Returns True if the output is attached to a hardware pipe, is
            enabled"""
         return self._info.contents.crtc != 0
+    
+    def is_definetely_connected(self):
+	if self._info.contents.connection == RR_CONNECTED:
+	    return True
+	return False
 
     def is_connected(self):
         """Return True if a device is detected at the output"""
