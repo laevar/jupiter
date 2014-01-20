@@ -709,6 +709,9 @@ class JupiterIndicator:
             except:
                 self.jupiter.currentRelation=5
             self.jupiter.load_pref_res()
+	    # avoiding too huge screen
+	    if screen._width > self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].height:
+		screen.set_size(self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].height,screen._width_mm,screen._height_mm)
             self.update_screen_menus()
             time.sleep(2)
         return True
