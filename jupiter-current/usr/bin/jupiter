@@ -630,7 +630,7 @@ class JupiterIndicator:
         
         # Set the timer callback
         #new: timeout increased to 10 seconds
-        gobject.timeout_add_seconds(2, self.query_update)
+        #gobject.timeout_add_seconds(2, self.query_update)
 
     def query_update(self):
 	print 'connected_ops ' + str(self.jupiter.connected_ops)
@@ -1130,7 +1130,9 @@ class JupiterIndicator:
                 primary_OP=output
             elif not self.jupiter.features.get(output.name).get('primary') and output.is_definetely_connected():
                 secondary_OP=output
-        if secondary_OP==None:
+        print primary_OP.name
+	print secondary_OP.name
+	if secondary_OP==None:
             return
         active_outputs=[]
         for out in self.jupiter.outputs:
@@ -1166,17 +1168,14 @@ class JupiterIndicator:
                     max_res_one=-1
                     max_res_two=-1
                     endloop=False
-                    for x in range(0, len(active_outputs)-1):
-                        if (x+1) >= len(active_outputs) or endloop==True:
+                    for y in range(0,len(primary_OP.get_available_modes())):
+                        if endloop==True:
                             break
-                        for y in range(0,len(active_outputs[x].get_available_modes())):
-                            if endloop==True:
-                                break
-                            for z in range(0,len(active_outputs[x+1].get_available_modes())):
-                                if active_outputs[x].get_available_modes()[y].name==active_outputs[x+1].get_available_modes()[z].name:
-                                    max_res_one=y
-                                    max_res_two=z
-                                    endloop=True
+                        for z in range(0,len(secondary_OP.get_available_modes())):
+                            if primary_OP.get_available_modes()[y].name==secondary_OP.get_available_modes()[z].name:
+			    	max_res_one=y
+                                max_res_two=z
+                                endloop=True
                                 if endloop==True:
                                     break
                     primary_OP.set_to_mode(max_res_one)
