@@ -630,7 +630,7 @@ class JupiterIndicator:
         
         # Set the timer callback
         #new: timeout increased to 10 seconds
-        #gobject.timeout_add_seconds(2, self.query_update)
+        gobject.timeout_add_seconds(2, self.query_update)
 
     def query_update(self):
 	print 'connected_ops ' + str(self.jupiter.connected_ops)

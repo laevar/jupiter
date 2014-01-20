@@ -806,7 +806,8 @@ class Screen:
         """Apply the given pixel and physical size to the screen"""
         _check_required_version((1,2))
         # Check if we really need to apply the changes
-        if (width, height, width_mm, height_mm) == self.get_size(): return
+	# has to be commented out because of disconnecting and connecting monitors of which this library does not know anything.
+        #if (width, height, width_mm, height_mm) == self.get_size(): return
         rr.XRRSetScreenSize(self._display, self._root,
                             c_int(width), c_int(height),
                             c_int(width_mm), c_int(height_mm))
@@ -913,11 +914,11 @@ class Screen:
             y = output._y
             w = get_mode_width(mode, output._rotation)
             h = get_mode_height(mode, output._rotation)
-            if x + w > width:
+            if x + w >= width:
                 width = x + w
         #phys_width+=output._info.contents.mm_width
         #biggerW = True
-            if y + h > height:
+            if y + h >= height:
                 height = y + h
         #phys_height+=output._info.contents.mm_height
         #biggerH = True
