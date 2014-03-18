@@ -641,8 +641,7 @@ class JupiterIndicator:
         gobject.timeout_add_seconds(2, self.query_update_new)
     
     def query_update_new(self):
-        f=open("/var/jupiter/udev_drm",'r')
-        date=time.ctime(os.path.getmtime(f))
+        date=time.ctime(os.path.getmtime("/var/jupiter/udev_drm"))
         if date!=self.jupiter.changeDate:
             self.jupiter.changeDate=date
             screen= xrand.get_screen_old_display(self.jupiter.dpy)
