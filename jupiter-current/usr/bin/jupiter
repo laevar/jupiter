@@ -24,6 +24,9 @@
 #  
 #  
 
+# vim: set ai sw=4 ts=4 sta et fo=croql
+
+
 import pygtk
 import os
 import glob 
@@ -72,23 +75,23 @@ class Jupiter:
         #self.vendor = self.get_vendor()
         self.primary=''
         self.video_modes = False
-	# getting data from xrandr library
+        # getting data from xrandr library
         self.dpy=xrand.get_current_display()
         self.screen = xrand.get_current_screen()
         self.dpi=math.ceil(math.sqrt((self.screen._height*self.screen._width)/((self.screen._height_mm/10.0)*(self.screen._width_mm/10.0)/6.4514)))
         self.monitors=self.screen.crtcs
         self.outputs = self.screen.get_outputs()
         self.connected_ops=0
-	self.active_ops=0
+        self.active_ops=0
         self.features={}
         self.rotations=[]
         secondary=''
         for op in self.outputs:
             if op.is_definetely_connected():
                 self.connected_ops+=1
-	    if op.is_active():
-		self.active_ops+=1
-	    # one time edid parsing
+            if op.is_active():
+                self.active_ops+=1
+            # one time edid parsing
             ediddata=self.parse_edid(op.name)
             monitorname=""
             identifier=""
@@ -133,13 +136,13 @@ class Jupiter:
             'high'  : 'Power On Demand',
             'powersave' : 'Power Savings '
         }
-	print 'connected_ops ' + str(self.connected_ops)
-	print 'active ops ' + str(self.active_ops)
+        print 'connected_ops ' + str(self.connected_ops)
+        print 'active ops ' + str(self.active_ops)
     
     # new!
     def __repr__(self):
 	""" Debugging function. Prints all major variables of current Screen, Crtcs and Outputs."""
-	s="Screen info:\n"
+        s="Screen info:\n"
         s+=" width: " + str(self.screen._width) + "\n"
         s+=" height: " + str(self.screen._height) + "\n"
         s+=" height mm: " + str(self.screen._width_mm) + "\n"
@@ -399,14 +402,14 @@ class Jupiter:
             active_outputs=[]
             fixbool=False
             self.connected_ops=0
-	    self.active_ops=0
+            self.active_ops=0
             for op in self.outputs:
                 if op.is_active():
                     active_outputs.append(op)
             for line in fo:
                 if line.startswith("["):
                     self.connected_ops+=1
-		    self.active_ops+=1
+                    self.active_ops+=1
                     outname=line.replace("[","").replace("]","").replace("\n","")
                 elif line.startswith("!"):
                     ps=line.split("=")[1].replace("\n","")
@@ -498,12 +501,12 @@ class Jupiter:
         primary=None
         secondary=None
         #self.connected_ops=0
-	#self.active_ops=0
+        #self.active_ops=0
         for op in self.outputs:
             #if op.is_definetely_connected():
             #    self.connected_ops+=1
-	    #if op.is_active():
-		#self.active_ops+=1
+            #if op.is_active():
+            #self.active_ops+=1
             self.features.get(op.name)['output']=op
             rotation=op.get_crtcs()[0]._info.contents.rotation
             if rotation >8 or rotation <1:
@@ -535,7 +538,7 @@ class JupiterIndicator:
             self.tray.set_visible(True)
         
         self.jupiter = Jupiter(PATH, VENDOR_PATH, VAR_PATH)
-	# loading of preferred settings takes place if there are any
+        # loading of preferred settings takes place if there are any
         self.jupiter.load_pref_res()
         self.update_icon()
         # create the principal menu
@@ -633,26 +636,25 @@ class JupiterIndicator:
         gobject.timeout_add_seconds(2, self.query_update)
 
     def query_update(self):
-	print 'connected_ops ' + str(self.jupiter.connected_ops)
-	print 'active ops ' + str(self.jupiter.active_ops)
+        print 'connected_ops ' + str(self.jupiter.connected_ops)
+        print 'active ops ' + str(self.jupiter.active_ops)
         screen= xrand.get_screen_old_display(self.jupiter.dpy)
         monitors=screen.crtcs
         outputs= screen.get_outputs()
         connected_ops=0
-	active_ops=0
+        active_ops=0
         for op in outputs:
             if op.is_definetely_connected():
                 connected_ops+=1
-	    if op.is_active():
-		active_ops+=1
-	print connected_ops
-	print active_ops
+    	    if op.is_active():
+                active_ops+=1
+        print connected_ops
+        print active_ops
         if connected_ops!=self.jupiter.connected_ops or active_ops != self.jupiter.active_ops:
-	    
             self.jupiter.connected_ops=connected_ops
-	    self.jupiter.active_ops=active_ops
-	    print 'connected_ops ' + str(self.jupiter.connected_ops)
-	    print 'active ops ' + str(self.jupiter.active_ops)
+            self.jupiter.active_ops=active_ops
+            print 'connected_ops ' + str(self.jupiter.connected_ops)
+            print 'active ops ' + str(self.jupiter.active_ops)
             self.jupiter.screen= screen
             self.jupiter.monitors= monitors
             self.jupiter.outputs= outputs
@@ -710,8 +712,8 @@ class JupiterIndicator:
                 self.jupiter.currentRelation=5
             self.jupiter.load_pref_res()
 	    # avoiding too huge screen
-	    if screen._width > self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].height:
-		screen.set_size(self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get_available_modes()[0].height,screen._width_mm,screen._height_mm)
+            if screen._width > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height:
+                screen.set_size(self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height,screen._width_mm,screen._height_mm)
             self.update_screen_menus()
             time.sleep(2)
         return True
@@ -723,13 +725,13 @@ class JupiterIndicator:
         self.jupiter.outputs= self.jupiter.screen.get_outputs()
         primary=None
         secondary=None
-	self.jupiter.connected_ops=0
-	self.jupiter.active_ops=0
+        self.jupiter.connected_ops=0
+        self.jupiter.active_ops=0
         for op in self.jupiter.outputs:
-	    if op.is_definetely_connected():
-		self.jupiter.connected_ops+=1
-	    if op.is_active():
-		self.jupiter.active_ops+=1
+            if op.is_definetely_connected():
+                self.jupiter.connected_ops+=1
+            if op.is_active():
+                self.jupiter.active_ops+=1
             self.jupiter.features.get(op.name)['output']=op
             rotation=op.get_crtcs()[0]._info.contents.rotation
             if rotation >8 or rotation <1:
@@ -1134,8 +1136,8 @@ class JupiterIndicator:
             elif not self.jupiter.features.get(output.name).get('primary') and output.is_definetely_connected():
                 secondary_OP=output
         print primary_OP.name
-	print secondary_OP.name
-	if secondary_OP==None:
+        print secondary_OP.name
+        if secondary_OP==None:
             return
         active_outputs=[]
         for out in self.jupiter.outputs:
@@ -1233,7 +1235,7 @@ class JupiterIndicator:
                             inactive_output.set_relation(primary_OP.name,relation+1)
                 inactive_output.get_crtcs()[0]._info.contents.noutput=1
         self.jupiter.connected_ops=2
-	self.jupiter.active_ops=2
+        self.jupiter.active_ops=2
         self.jupiter.currentRelation=relation
         self._apply_output_cfg()
         self.jupiter.save_pref_res()
