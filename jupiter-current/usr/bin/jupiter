@@ -27,8 +27,10 @@
 # vim: set ai sw=4 ts=4 sta et fo=croql
 
 
+
 import pygtk
 import os
+import os.path, time
 import glob 
 pygtk.require('2.0')
 import gtk, gobject
@@ -138,6 +140,9 @@ class Jupiter:
         }
         print 'connected_ops ' + str(self.connected_ops)
         print 'active ops ' + str(self.active_ops)
+        open("/var/jupiter/udev_drm", 'w').close()
+        self.changeDate=time.ctime(os.path.getmtime("/var/jupiter/udev_drm"))
+        #print self.changeDate
     
     # new!
     def __repr__(self):
@@ -633,7 +638,93 @@ class JupiterIndicator:
         
         # Set the timer callback
         #new: timeout increased to 10 seconds
-        gobject.timeout_add_seconds(2, self.query_update)
+        gobject.timeout_add_seconds(2, self.query_update_new)
+    
+    def query_update_new(self):
+        f=open("/var/jupiter/udev_drm",'r')
+        date=time.ctime(os.path.getmtime(f))
+        if date!=self.jupiter.changeDate:
+            self.jupiter.changeDate=date
+            screen= xrand.get_screen_old_display(self.jupiter.dpy)
+            monitors=screen.crtcs
+            outputs= screen.get_outputs()
+            connected_ops=0
+            active_ops=0
+            for op in outputs:
+               if op.is_definetely_connected():
+                   connected_ops+=1
+               if op.is_active():
+                  active_ops+=1
+            print active_ops
+            print connected_ops
+            self.jupiter.connected_ops=connected_ops
+            self.jupiter.active_ops=active_ops
+            print 'connected_ops ' + str(self.jupiter.connected_ops)
+            print 'active ops ' + str(self.jupiter.active_ops)
+            self.jupiter.screen= screen
+            self.jupiter.monitors= monitors
+            self.jupiter.outputs= outputs
+            self.jupiter.features={}
+            self.jupiter.rotations=[]
+            self.jupiter.primary=''
+            secondary=''
+            for op in self.jupiter.outputs:
+                self.jupiter.features[op.name]={'output':op,'edid':'','monitorname':'','identifier':''}
+                ediddata=self.jupiter.parse_edid(op.name)
+                monitorname=""
+                identifier=""
+                if ediddata!=None:
+                    if ediddata.get('serial_32') != None and ediddata.get('serial_32') !=0:
+		            # arrange individual identifier from edid parsing
+                        identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("serial_32"))
+                    else:
+                        identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("product_id"))
+                    try:
+                        if ediddata.get('monitor_name')!=None:
+                            monitorname=ediddata.get('monitor_name')
+                        else:
+                            monitorname=op.name
+                    except:
+                        monitorname=op.name
+                    self.jupiter.features.get(op.name)['edid']=ediddata
+                    self.jupiter.features.get(op.name)['monitorname']=monitorname
+                    self.jupiter.features.get(op.name)['identifier']=identifier
+                    #print self.jupiter.features.get(op.name).get('monitorname')
+                    #print identifier
+                    if op.name=='LVDS1':
+		            # if no saved data: Setting LVDS1 primary by default.
+                        self.jupiter.features.get(op.name)['primary']=True
+                        try:
+                            self.jupiter.features.get(self.jupiter.primary)['primary']=False
+                            secondary=self.jupiter.primary
+                            self.jupiter.primary=op.name
+                        except:
+                            self.jupiter.primary=op.name
+                    else:
+		            # if no LVDS1 available, randomly choose primary if no saved data
+                        if self.jupiter.primary=='':
+                            self.jupiter.features.get(op.name)['primary']=True
+                            self.jupiter.primary=op.name
+                        else:
+                            self.jupiter.features.get(op.name)['primary']=False
+                            secondary=op.name
+                self.jupiter.rotations.append(op._rotation)
+            subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
+            self.jupiter.currentMode=0
+	# find current position of monitors
+            try:
+                self.jupiter.currentRelation=self.jupiter.find_position(self.jupiter.features.get(self.jupiter.primary).get('output'),self.jupiter.features.get(secondary).get('output'))
+            except:
+                self.jupiter.currentRelation=5
+            self.jupiter.load_pref_res()
+	    # avoiding too huge screen
+            if screen._width > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height:
+                #screen.set_size(self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height,screen._width_mm,screen._height_mm)
+                pass
+            self.update_screen_menus()
+            time.sleep(2)
+        return True
+
 
     def query_update(self):
         print 'connected_ops ' + str(self.jupiter.connected_ops)
@@ -713,7 +804,8 @@ class JupiterIndicator:
             self.jupiter.load_pref_res()
 	    # avoiding too huge screen
             if screen._width > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height:
-                screen.set_size(self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height,screen._width_mm,screen._height_mm)
+                #screen.set_size(self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width,self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height,screen._width_mm,screen._height_mm)
+                pass
             self.update_screen_menus()
             time.sleep(2)
         return True
