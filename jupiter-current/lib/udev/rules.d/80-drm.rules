@@ -1,1 +1,1 @@
-ACTION=="change", SUBSYSTEM=="drm", RUN+="/usr/lib/jupiter/scripts/vga-out mon"
+ACTION=="change", SUBSYSTEM=="drm", RUN+="/usr/bin/touch /var/jupiter/udev_drm"
