@@ -724,7 +724,7 @@ class JupiterIndicator:
             time.sleep(2)
         return True
 
-        def update_data(self,relation=None):
+    def update_data(self,relation=None):
 	"""get new data from xrandr library (case sth. changed during usage)"""
         self.jupiter.screen= xrand.get_screen_old_display(self.jupiter.dpy)
         self.jupiter.monitors=self.jupiter.screen.crtcs
