@@ -1116,7 +1116,7 @@ class JupiterIndicator:
         self.jupiter.features.get(outputname)['primary']=True
         subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
         try:
-            subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.ijupiter.primary])
+            subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.jupiter.primary])
         except:
             print ""
         self.update_data()
