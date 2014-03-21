@@ -482,7 +482,7 @@ class Jupiter:
 	""" Parses all available edid data and returns a dictionary with all important values"""
         edids=glob.glob(DIR+"/*/edid")
         for ed in edids:
-            if outputname in ed.replace("-",""):
+            if outputname in ed.replace("-","").replace("HDMIA","HDMI"):
                 try:
                     fo=open(ed,"r")
                     data=""
