@@ -687,12 +687,9 @@ class JupiterIndicator:
                         identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("serial_32"))
                     else:
                         identifier+= ediddata.get("manufacturer_id") + str(ediddata.get("product_id"))
-                    try:
-                        if ediddata.get('monitor_name')!=None:
-                            monitorname=ediddata.get('monitor_name')
-                        else:
-                            monitorname=op.name
-                    except:
+                    if ediddata.get('monitor_name')!=None:
+                        monitorname=ediddata.get('monitor_name')
+                    else:
                         monitorname=op.name
                     self.jupiter.features.get(op.name)['edid']=ediddata
                     self.jupiter.features.get(op.name)['monitorname']=monitorname
@@ -728,6 +725,7 @@ class JupiterIndicator:
                 self.jupiter.currentRelation=self.jupiter.find_position(self.jupiter.features.get(self.jupiter.primary).get('output'),self.jupiter.features.get(secondary).get('output'))
             except:
                 self.jupiter.currentRelation=5
+            self.switch_displays(self.jupiter.currentRelation)
             self.jupiter.load_pref_res()
 	    # avoiding too huge screen
             if screen._width > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].width or screen._height > self.jupiter.features.get(self.jupiter.primary).get('output').get_available_modes()[0].height:
@@ -1162,18 +1160,27 @@ class JupiterIndicator:
                 primary_OP=output
             elif not self.jupiter.features.get(output.name).get('primary') and output.is_definetely_connected():
                 secondary_OP=output
-        print primary_OP.name
-        print secondary_OP.name
-        if secondary_OP==None:
-            return
+        #print primary_OP.name
+        #print secondary_OP.name
+        #if secondary_OP==None:
+        #    return
         active_outputs=[]
         for out in self.jupiter.outputs:
             if out.is_active():
                 active_outputs.append(out)
         if relation ==5:
             before.write(repr(self.jupiter))
-            subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
-            subprocess.check_call(["xrandr","--screen", "0","--size", self.jupiter.get_current_mode(primary_OP),"--dpi", str(self.jupiter.dpi)])
+            print primary_OP.name
+            print primary_OP.get_available_modes()[0].name
+            try:
+                subprocess.check_call(["xrandr","--output",secondary_OP.name,"--off"])
+            except:
+                subprocess.check_call(["xrandr","--output",self.jupiter.primary ,"--auto"])
+            try:
+                subprocess.check_call(["xrandr","--screen", "0","--size", self.jupiter.get_current_mode(primary_OP),"--dpi", str(self.jupiter.dpi)])
+            except:
+                print 'entered correct thing'
+                subprocess.check_call(["xrandr","--screen", "0","--size", primary_OP.get_available_modes()[0].name])
             self.jupiter.active_ops=1
             self.jupiter.currentRelation=relation
             self.update_data(relation)
