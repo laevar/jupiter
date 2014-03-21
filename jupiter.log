@@ -23,6 +23,7 @@ Major changes:
     - Powersave settings changed, only powersave True and False can be selected. Using
     pictures from std.library instead of lightning bolt.
 
+    - For xfce4: Panel will automatically be set to chosen primary output
 Bugs:
 
     - Powersave changes cannot be applied (only as root). pm-powersave was the idea.
