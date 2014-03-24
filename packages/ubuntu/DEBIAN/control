@@ -1,15 +1,18 @@
 Package: jupiter
-Version: 0.2.1-2
+Version: 0.5.0-0
 Architecture: all
 Maintainer: Jochen Schulz <schulz@math.uni-goettingen.de>
 Installed-Size: 187
-Depends: python-appindicator, python-gtk2, libnotify-bin, xinput, rfkill, acpi-support
+Depends: python-appindicator, python-gtk2, libnotify-bin, pm-utils, xubuntu-icon-theme, rfkill, xinput
 Section: universe/x11
 Priority: extra
 Homepage: https://github.com/laevar/jupiter
 Description: Jupiter Notification Icon / AppIndicator
  Jupiter is a light weight power, hardware control and display management applet for Linux.
  The applet uses Python and comes with an Ubuntu AppIndicator.
+ .
+ It features xrandr-options for 2 displays. It saves and restores the state of monitor-configurations 
+ dependent on the individual monitor-setups.
  .
  Additionally, Jupiter provides quick access to some of the commonly
  needed hardware controls like screen output and resolution, WIFI, and bluetooth.
