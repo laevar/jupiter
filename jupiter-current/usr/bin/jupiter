@@ -1073,7 +1073,7 @@ class JupiterIndicator:
                     elif op!=output and op.is_definetely_connected():
                         related_output=op
                         break
-                if mode!=None:
+                if mode!=None and related_output!=None:
                     self.set_resolution(mode,output,related_output)
                     self.jupiter.currentMode=mode
 
@@ -1132,8 +1132,9 @@ class JupiterIndicator:
                 relation_output=op
             elif op.name==outputname and op.is_active():
                 output=op
-        relation=self.jupiter.find_position(output,relation_output)
-        output.set_relation(relation_output.name,relation)
+        if relation_output!=None:
+            relation=self.jupiter.find_position(output,relation_output)
+            output.set_relation(relation_output.name,relation)
         output._rotation=rotation
         self._apply_output_cfg()
         self.jupiter.save_pref_res()
