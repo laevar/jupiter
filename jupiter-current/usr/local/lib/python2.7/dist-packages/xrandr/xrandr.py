@@ -88,7 +88,7 @@ Status = c_int
 
 # load the libs
 xlib = cdll.LoadLibrary("libX11.so")
-rr = cdll.LoadLibrary("libXrandr.so")
+rr = cdll.LoadLibrary("libXrandr.so.2")
 
 # query resources
 class _XRRModeInfo(Structure):
