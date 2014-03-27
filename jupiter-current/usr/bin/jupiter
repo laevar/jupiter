@@ -138,10 +138,7 @@ class Jupiter:
             print ""
         self.currentMode=0
     	# find current position of monitors
-        try:
-            self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
-        except:
-            self.currentRelation=xrand.RELATION_LEFT_OF
+        self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
         self.displays = []
         self.performance_modes = {
             'high'  : 'Power On Demand',
@@ -367,12 +364,14 @@ class Jupiter:
         if not relation_output.is_active() and relation_output.is_definetely_connected():
             return 6
         for monitor in self.monitors:
-            if monitor.get_outputs()[0].name==change_output.name:
-                change_x=monitor._info.contents.x
-                change_y=monitor._info.contents.y
-            else:
-                relation_x=monitor._info.contents.x
-                relation_y=monitor._info.contents.y
+            try:
+                if monitor.get_outputs()[0].name==change_output.name:
+                    change_x=monitor._info.contents.x
+                    change_y=monitor._info.contents.y
+                else:
+                    relation_x=monitor._info.contents.x
+                    relation_y=monitor._info.contents.y
+            except: print "Pseudomonitor detected."
 	# based on position relative to each other -> assign relations
         if change_x < relation_x:
             relation=xrand.RELATION_LEFT_OF
