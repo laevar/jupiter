@@ -1,9 +1,9 @@
 Package: jupiter
-Version: 0.5.0-0
+Version: 0.5.0-1
 Architecture: all
 Maintainer: Jochen Schulz <schulz@math.uni-goettingen.de>
 Installed-Size: 187
-Depends: python-appindicator, python-gtk2, libnotify-bin, pm-utils, xubuntu-icon-theme, rfkill, xinput
+Depends: python-appindicator, python-gtk2, libnotify-bin, pm-utils, xubuntu-icon-theme, rfkill, xinput, libxrandr2
 Section: universe/x11
 Priority: extra
 Homepage: https://github.com/laevar/jupiter
