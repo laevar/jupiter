@@ -112,23 +112,24 @@ class Jupiter:
             except:
                 monitorname=op.name
             self.features[op.name]={'output':op,'edid':ediddata,'monitorname':monitorname,'identifier':identifier}
-            if op.name=='LVDS1':
-		# if no saved data: Setting LVDS1 primary by default.
-                self.features.get(op.name)['primary']=True
-                try:
-                    self.features.get(self.primary)['primary']=False
-                    secondary=self.primary
-                    self.primary=op.name
-                except:
-                    self.primary=op.name
-            else:
-		# if no LVDS1 available, randomly choose primary if no saved data
-                if self.primary=='':
+            if op.is_definetely_connected():
+                if op.name=='LVDS1':
+	    	    # if no saved data: Setting LVDS1 primary by default.
                     self.features.get(op.name)['primary']=True
-                    self.primary=op.name
+                    try:
+                        self.features.get(self.primary)['primary']=False
+                        secondary=self.primary
+                        self.primary=op.name
+                    except:
+                        self.primary=op.name
                 else:
-                    self.features.get(op.name)['primary']=False
-                    secondary=op.name
+		        # if no LVDS1 available, randomly choose primary if no saved data
+                    if self.primary=='':
+                        self.features.get(op.name)['primary']=True
+                        self.primary=op.name
+                    else:
+                        self.features.get(op.name)['primary']=False
+                        secondary=op.name
             self.rotations.append(op._rotation)
         subprocess.check_call(["xrandr","--output",self.primary,"--primary"])
         try:
