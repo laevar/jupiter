@@ -137,8 +137,11 @@ class Jupiter:
         except:
             print ""
         self.currentMode=0
-	# find current position of monitors
-        self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
+    	# find current position of monitors
+        try:
+            self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
+        except:
+            self.currentRelation=xrand.RELATION_LEFT_OF
         self.displays = []
         self.performance_modes = {
             'high'  : 'Power On Demand',
