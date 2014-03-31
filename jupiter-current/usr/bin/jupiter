@@ -74,7 +74,7 @@ class Jupiter:
         self.bluetooth = self.check_state('/bluetooth')
         self.wifi = self.check_state('/wifi')
         self.touchpad = self.check_state('/touchpad')
-        
+        self.panelnumber=0
         #self.vendor = self.get_vendor()
         self.primary=''
         self.video_modes = False
@@ -132,8 +132,18 @@ class Jupiter:
                         secondary=op.name
             self.rotations.append(op._rotation)
         subprocess.check_call(["xrandr","--output",self.primary,"--primary"])
+        count=0
+        for i in range(0,10):
+            try:
+                numOfOccurences=int(subprocess.check_output('xfconf-query -c xfce4-panel -l | grep -c panel-'+str(i),shell=True).rstrip())
+                print numOfOccurences 
+                if numOfOccurences>count:
+                    count=numOfOccurences
+                    self.panelnumber=i
+            except:
+                break
         try:
-           subprocess.check_call(["xfconf-query","-c", "xfce4-panel","-np","/panels/panel-0/output-name", "-t", "string","-s", self.primary])
+           subprocess.check_call(["xfconf-query","-c", "xfce4-panel","-np","/panels/panel-" + str(self.panelnumber)+"/output-name", "-t", "string","-s", self.primary])
         except:
             print ""
         self.currentMode=0
@@ -438,7 +448,7 @@ class Jupiter:
                                 self.primary=outname
                                 subprocess.check_call(["xrandr","--output",self.primary,"--primary"])
                                 try:
-                                    subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.primary])
+                                    subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-"+ str(self.panelnumber)+"/output-name","-s",self.primary])
                                 except:
                                     print ""
                         else:
@@ -717,7 +727,7 @@ class JupiterIndicator:
                 self.jupiter.rotations.append(op._rotation)
             subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
             try:
-                subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.jupiter.primary])
+                subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-"+str(self.jupiter.panelnumber)+"/output-name","-s",self.jupiter.primary])
             except:
                 print ""
             self.jupiter.currentMode=0
@@ -1101,7 +1111,7 @@ class JupiterIndicator:
                 self.jupiter.primary=outputname
                 subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
                 try:
-                    subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.jupiter.primary])
+                    subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-"+str(self.jupiter.panelnumber)+"/output-name","-s",self.jupiter.primary])
                 except:
                     print ""
                 self.jupiter.features.get(outputname)['primary']=True
@@ -1115,7 +1125,7 @@ class JupiterIndicator:
         self.jupiter.features.get(outputname)['primary']=True
         subprocess.check_call(["xrandr","--output",self.jupiter.primary,"--primary"])
         try:
-            subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-0/output-name","-s",self.jupiter.primary])
+            subprocess.check_call(["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/panel-"+str(self.jupiter.panelnumber)+"/output-name","-s",self.jupiter.primary])
         except:
             print ""
         self.update_data()
