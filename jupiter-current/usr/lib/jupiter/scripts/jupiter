@@ -12,13 +12,13 @@ if [ ! -d "$JUPITER_VAR" ]; then
 fi
 
 
-if [ -e "$JUPITER_VAR/cpu-control-busy" ]; then
-  rm -f $JUPITER_VAR/cpu-control-busy >/dev/null 2>&1 || true
-fi
+#if [ -e "$JUPITER_VAR/cpu-control-busy" ]; then
+#  rm -f $JUPITER_VAR/cpu-control-busy >/dev/null 2>&1 || true
+#fi
 
-if [ -e "$JUPITER_VAR/cpu_mode" ]; then
-  sudo $JUPITER_PATH/cpu-control restore 2>/dev/null &
-fi
+#if [ -e "$JUPITER_VAR/cpu_mode" ]; then
+#  sudo $JUPITER_PATH/cpu-control restore 2>/dev/null &
+#fi
 
 if [ -e "$JUPITER_VAR/bt_saved" ]; then
   sudo $JUPITER_PATH/bluetooth restore 2>/dev/null &
@@ -36,30 +36,30 @@ if [ -e "$JUPITER_VAR/touchpad_saved" ]; then
   (sleep 5; $JUPITER_PATH/touchpad restore silent 2>/dev/null) &
 fi
 
-if [ -e "$JUPITER_VAR/vga_saved" ]; then
-  sudo $JUPITER_PATH/vga-out restore silent 2>/dev/null &
-fi
+#if [ -e "$JUPITER_VAR/vga_saved" ]; then
+#  sudo $JUPITER_PATH/vga-out restore silent 2>/dev/null &
+#fi
 
-if [ -e "$JUPITER_VAR/primary_saved" ]; then
-  sudo $JUPITER_PATH/primary restore silent 2>/dev/null &
-fi
+#if [ -e "$JUPITER_VAR/primary_saved" ]; then
+#  sudo $JUPITER_PATH/primary restore silent 2>/dev/null &
+#fi
 
-sudo $JUPITER_PATH/vga-out mon silent 2>/dev/null &
+#sudo $JUPITER_PATH/vga-out mon silent 2>/dev/null &
 
 for display in $(cat $JUPITER_VAR/displays); do
   if [ ! -e "$JUPITER_VAR/available_resolutions_$display" ]; then
     touch $JUPITER_VAR/available_resolutions_$display
   fi
 
-  if [ -e "$JUPITER_VAR/rotation_saved_$display" ]; then
-    sudo $JUPITER_PATH/rotate restore silent $display 2>/dev/null &
-  fi
+  #if [ -e "$JUPITER_VAR/rotation_saved_$display" ]; then
+  #  sudo $JUPITER_PATH/rotate restore silent $display 2>/dev/null &
+  #fi
 
-  if [ -e "$JUPITER_VAR/resolution_saved_$display" ] ; then
-    sudo $JUPITER_PATH/resolutions restore $display 2>/dev/null &
-  fi
+  #if [ -e "$JUPITER_VAR/resolution_saved_$display" ] ; then
+  #  sudo $JUPITER_PATH/resolutions restore $display 2>/dev/null &
+  #fi
 
-  $JUPITER_PATH/resolutions modes $display &
+  #$JUPITER_PATH/resolutions modes $display &
 done 
 
 #chown root:jupiter $JUPITER_VAR/*
