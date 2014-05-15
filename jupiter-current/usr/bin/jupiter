@@ -36,6 +36,8 @@ pygtk.require('2.0')
 import gtk, gobject
 import re
 import time
+import getpass
+import socket
 import string
 import threading
 import xrandr.xrandr as xrand
@@ -493,9 +495,14 @@ class Jupiter:
         
     def create_filename(self):
 	""" Creates unique filename for storage of setting using edid identifier"""
-        filename="/var/jupiter/saved_"
+        #filename="/var/jupiter/saved_"
+        filename="/home/"
+        filename+=getpass.getuser()
+        filename+="/.jupiter_"
         for op in self.outputs:
             filename+=self.features.get(op.name).get('identifier')
+        filename+="_"
+        filename+=socket.gethostname()
         return filename
 
     def parse_edid(self,outputname=None):
