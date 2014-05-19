@@ -37,6 +37,7 @@ import gtk, gobject
 import re
 import time
 import getpass
+import shutil
 import socket
 import string
 import threading
@@ -91,6 +92,7 @@ class Jupiter:
         self.features={}
         self.rotations=[]
         secondary=''
+        self.rename_oldsaves()
         for op in self.outputs:
             if op.is_definetely_connected():
                 self.connected_ops+=1
@@ -223,6 +225,11 @@ class Jupiter:
             s+=" mm_width: " + str(output._info.contents.mm_width) + "\n"
             s+=" modes: " + str(output._info.contents.modes) + "\n"
         return s
+    
+    def rename_oldsaves(self):
+        for f in os.listdir('/var/jupiter/'):
+            if f.startswith("saved_"):
+                shutil.move('/var/jupiter/' + f, '/home/' + getpass.getuser() +'/.jupiter_' + f.split('_')[1]+'_'+socket.gethostname())
 
     def get_output(self, command, args=None, msg=None, sudo=False):
         """ Execute a command and returns the standard output, deleting
