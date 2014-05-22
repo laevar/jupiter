@@ -33,6 +33,13 @@ case "$1" in
       echo "Setting permissions.."
       chown -R root:jupiter /usr/lib/jupiter
       #chown -R root:root /etc/acpi/events
+      touch /var/log/jupiter_before.log
+      chmod 664 /var/log/jupiter_before.log
+      chown root:jupiter /var/log/jupiter_before.log
+
+      touch /var/log/jupiter_after.log
+      chmod 664 /var/log/jupiter_after.log
+      chown root:jupiter /var/log/jupiter_after.log
 
       if [ ! -d "/var/jupiter" ]; then
         mkdir /var/jupiter
@@ -42,7 +49,7 @@ case "$1" in
        	chown -R root:jupiter /var/jupiter
         chmod -R 775 /var/jupiter
       	chmod  ug+s /var/jupiter
-       	setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX /var/jupiter
+       	#setfacl -Rm g:jupiter:rwX,d:g:jupiter:rwX /var/jupiter
       fi
     ;;
 

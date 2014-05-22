@@ -60,8 +60,8 @@ PATH = "/usr/lib/jupiter/scripts"
 VENDOR_PATH = "/usr/lib/jupiter/vendors"
 VAR_PATH = "/var/jupiter"
 DIR="/sys/class/drm/"
-before= open("/var/jupiter/jupiter_before.log","a")
-after= open("/var/jupiter/jupiter_after.log","a")
+before= open("/var/log/jupiter_before.log","a")
+after= open("/var/log/jupiter_after.log","a")
 
 class Jupiter:
     """ Class to handle all possible configurations for the devices """
