@@ -323,9 +323,8 @@ class Jupiter:
         return self.powersave
     
     def get_cpu_mode_name(self):
-        temp = int(self.collect_data(self.temp))
-        cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-        return self.get_cpu-mode
+        cpu_name= str(self.collect_data(self.cpu_freq))
+        return cpu_name
     
     #def current_rotation(self,args):
         #return self.get_device('/rotation_saved_'+args, 'rotate', ['normal',args]).split(' ')[0]
@@ -677,6 +676,8 @@ class JupiterIndicator:
         gobject.timeout_add_seconds(2, self.query_update_new)
     
     def query_update_new(self):
+        self.menu.remove(self.menu.get_children()[0])
+        self.update_menu_info()
         date=time.ctime(os.path.getmtime("/var/jupiter/udev_drm"))
         if date!=self.jupiter.changeDate:
             self.jupiter.changeDate=date
@@ -816,7 +817,7 @@ class JupiterIndicator:
    
     def update_screen_menus(self):
 	""" Updates screen menu in cased data is updated (external things happend)"""
-        # screen menu
+        # screen menuself.menu.remove(self.menu.get_children()[6])
         self.menu.remove(self.menu.get_children()[6])
         resolutions = gtk.Menu()
         res_item = gtk.MenuItem('Screen Resolutions')
