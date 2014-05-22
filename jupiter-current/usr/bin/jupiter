@@ -72,7 +72,7 @@ class Jupiter:
         self.vendors = vendors
         self.var = var
         self.temp = '/sys/devices/virtual/hwmon/hwmon0/temp1_input'
-        #self.cpu_freq = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+        self.cpu_freq = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
         self.powersave=False
         self.bluetooth = self.check_state('/bluetooth')
         self.wifi = self.check_state('/wifi')
@@ -323,7 +323,9 @@ class Jupiter:
         return self.powersave
     
     def get_cpu_mode_name(self):
-        return self.performance_modes[self.get_device('/cpu_mode', 'cpu-control', 'initial')]
+        temp = int(self.collect_data(self.temp))
+        cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+        return self.get_cpu-mode
     
     #def current_rotation(self,args):
         #return self.get_device('/rotation_saved_'+args, 'rotate', ['normal',args]).split(' ')[0]
