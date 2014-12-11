@@ -53,9 +53,9 @@ except ImportError, ex:
     loaded_indicator = False
 
 APP_TITLE = 'Jupiter'
-APP_DESCRIPTION = 'Generic interface for display, power, and device control.'
-APP_COPYRIGHT = 'Copyright 2009-2012 Andrew Wyatt (Fewt)\n and Jorge Luis Betancourt'
-APP_VERSION = '0.1.11'
+APP_DESCRIPTION = 'Generic interface for display and power control.'
+APP_COPYRIGHT = 'Copyright 2009-2012 Andrew Wyatt (Fewt)\n and Jorge Luis Betancourt.\n Copyright 2012-2014 Jochen Schulz and Kevin Neumann (NAM Goettingen).'
+APP_VERSION = '0.5.3'
 PATH = "/usr/lib/jupiter/scripts"
 VENDOR_PATH = "/usr/lib/jupiter/vendors"
 VAR_PATH = "/var/jupiter"
@@ -74,11 +74,7 @@ class Jupiter:
         self.temp = '/sys/devices/virtual/hwmon/hwmon0/temp1_input'
         self.cpu_freq = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
         self.powersave=False
-        self.bluetooth = self.check_state('/bluetooth')
-        self.wifi = self.check_state('/wifi')
-        self.touchpad = self.check_state('/touchpad')
         self.panelnumber=0
-        #self.vendor = self.get_vendor()
         self.primary=''
         self.video_modes = False
         # getting data from xrandr library
@@ -259,43 +255,12 @@ class Jupiter:
     def check_state(self, cmd):
         """ Check the status of the device passed as cmd """
         return self.get_output(cmd, 'status')
-
-    def get_vendor(self):
-        """ Get the CPU vendor model of the computer """
-        return self.get_output('/cpu-control', 'vendor', 'Unable to get vendor information for this system', True)
-        
-    def get_video_modes(self):
-        """ Detect the available video modes (resolutions) """
-        self.video_modes = True
-        cmd = ['sudo', self.path + '/resolutions', 'modes']
-        try:
-            subprocess.Popen(cmd, shell=False).wait()
-            return True
-        except Exception, ex:
-            print 'Unable to capture available video modes + ' + ex
-        cmd = ['sudo', self.path + '/resolutions', 'modes','VGA1']
-        try:
-            subprocess.Popen(cmd, shell=False).wait()
-            return True
-        except Exception, ex:
-            print 'Unable to capture available video modes + ' + ex
-        return False
-
+    
     def exec_command(self, cmd, args):
         """ Execute custom command and returns the standard output
         customizing the error message """
         return self.get_output('/' + cmd, args, 'Unable to execute command: ' + cmd + ' with arguments ' + str(args), True)
-    
-    def switch_state(self, state):
-        """ Switch throw state, return True or False according to the
-        activation status [ON|OFF] of the device """
-        if state == 'OFF' or state == '0':
-            return False
-        elif state == 'ON' or state == '1':
-            return True
-        else:
-            return None
-    
+        
     def collect_data(self, args):
         """ Read the content of the file, replacing all new line characters
         and returns the content """
@@ -305,23 +270,7 @@ class Jupiter:
         except Exception:
             pass
         return False
-
-    def match_active_device(self, fname, expr, command=None, args=None):
-        data = self.collect_data(self.var + fname)
-        if data == False:
-            self.exec_command(command, args)
-            return True
-        if re.match(expr, data):
-            return True
-        return False
     
-    def get_device(self, fname, cmd=None, args=None):
-        data = self.collect_data(self.var + fname)
-        if data == False:
-            self.exec_command(cmd, args)
-            data = self.collect_data(self.var + fname)
-        return data
-
     def is_cpu_mode(self, args=''):
         return args==self.powersave
     
@@ -332,24 +281,15 @@ class Jupiter:
     def get_cpu_mode_name(self):
         cpu_name= str(self.collect_data(self.cpu_freq))
         return cpu_name
-    
-    #def current_rotation(self,args):
-        #return self.get_device('/rotation_saved_'+args, 'rotate', ['normal',args]).split(' ')[0]
-    
+        
     def current_primary(self):
 	""" Returns current primary"""
         return self.primary
 
-    #def is_current_rotation(self, args,display):
-        #return self.match_active_device('/rotation_saved_'+display, args, 'rotate', ['normal ',display])
-
     def get_current_relation(self):
 	""" Returns current relation."""
         return self.currentRelation
-
-    def is_current_display(self, args):
-        return self.match_active_device('/vga_saved', args, 'vga-out', 'clone')
-
+    
     def get_displays(self):
         #self.update_data()
         displays=[]
@@ -357,10 +297,7 @@ class Jupiter:
             if op.is_active:
                 displays.append(op.name)
         return displays
-
-    #def get_available_resolutions(self, args):
-        #return self.get_device('/available_resolutions_' + args,'resolutions','modes ' + args).split(' ')
-    
+        
     def get_temperature(self):
         temp = int(self.collect_data(self.temp))
         temp = temp / 1000
@@ -597,7 +534,6 @@ class JupiterIndicator:
         # create the principal menu
         self.menu = gtk.Menu()
         performances = gtk.Menu()
-        devices = gtk.Menu()
         resolutions = gtk.Menu()
         orientations = gtk.Menu()
         primary = gtk.Menu()
@@ -605,7 +541,6 @@ class JupiterIndicator:
 
         # create menu items for the menus, about and exit
         perf_item = gtk.MenuItem('Performance')
-        dev_item = gtk.MenuItem('Devices')
         res_item = gtk.MenuItem('Screen Resolutions')
         ort_item = gtk.MenuItem('Screen Orientation')
         prim_item = gtk.MenuItem('Primary Display')
@@ -614,8 +549,6 @@ class JupiterIndicator:
         # link the menu item with the corresponding submenu
         perf_item.set_submenu(performances)
         perf_item.show()
-        dev_item.set_submenu(devices)
-        dev_item.show()
         res_item.set_submenu(resolutions)
         res_item.show()
         ort_item.set_submenu(orientations)
@@ -637,8 +570,6 @@ class JupiterIndicator:
         self.menu.append(seps[3])
         self.menu.append(perf_item)
         self.menu.append(seps[0])
-        self.menu.append(dev_item)
-        self.menu.append(seps[1])
         self.menu.append(res_item)
         self.menu.append(ort_item)
         self.menu.append(prim_item)
@@ -653,9 +584,6 @@ class JupiterIndicator:
         
         # Performance Menu
         threading.Thread(target=self.update_performance_menu, args=[performances]).start()
-        
-        # Devices menu
-        threading.Thread(target=self.update_devices_menu, args=[devices]).start()
         
         # Screen resolutions
         threading.Thread(target=self.update_screen_resolutions, args=[resolutions]).start()
@@ -974,34 +902,6 @@ class JupiterIndicator:
                     item.show()
                     dp.append(item)
                 resolutions.append(dp_item)
- 
-    def update_devices_menu(self, devices):
-        if self.jupiter.wifi != 'UNKNOWN':
-            check = gtk.CheckMenuItem("Enable Wifi")
-            if self.jupiter.switch_state(self.jupiter.wifi):
-                check.set_active(True)
-                check.set_label('Disable Wifi')
-            check.connect("toggled", self.switch_device, 'wifi')
-            check.show()
-            devices.append(check)
-        
-        if self.jupiter.touchpad != 'UNKNOWN':
-            check = gtk.CheckMenuItem("Enable Touchpad")
-            if self.jupiter.switch_state(self.jupiter.touchpad):
-                check.set_active(True)
-                check.set_label('Disable Touchpad')
-            check.connect("toggled", self.switch_device, 'touchpad')
-            check.show()
-            devices.append(check)
-        
-        if self.jupiter.bluetooth != 'UNKNOWN':
-            check = gtk.CheckMenuItem("Enable Bluetooth")
-            if self.jupiter.switch_state(self.jupiter.bluetooth):
-                check.set_active(True)
-                check.set_label('Disable Bluetooth')
-            check.connect("toggled", self.switch_device, 'bluetooth')
-            check.show()
-            devices.append(check)
     
     def update_performance_menu(self, performances):
 	""" Builds and updates performance menu in case of changes"""
@@ -1083,16 +983,7 @@ class JupiterIndicator:
                             self.ind.set_icon('bolt4')
                         else:
                             self.tray.set_from_icon_name("bolt4")
-    
-    def switch_device(self, widget, data=None):
-        if data != None:
-            self.jupiter.exec_command(data, 'toggle')
-            state = self.jupiter.check_state('/' + data)
-            if self.jupiter.switch_state(state) == True:
-                widget.set_label('Disable ' + string.capwords(data))
-            elif self.jupiter.switch_state(state) == False:
-                widget.set_label('Enable ' + string.capwords(data))
-    
+        
     def _apply_output_cfg(self):
 	"""Applies changes to outputs and crtcs"""
         before.write("BEFORE CHANGE")
