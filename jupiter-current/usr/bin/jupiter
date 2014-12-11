@@ -152,7 +152,14 @@ class Jupiter:
             print ""
         self.currentMode=0
     	# find current position of monitors
-        self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
+        print secondary
+        print self.primary
+        if secondary!=None and secondary!='' and self.primary !=None:
+          self.currentRelation=self.find_position(self.features.get(self.primary).get('output'),self.features.get(secondary).get('output'))
+        elif secondary==None or secondary=='':
+          self.currentRelation=5
+        else:
+          self.currentRelation=6
         self.displays = []
         self.performance_modes = {
             'high'  : 'Power On Demand',
@@ -362,6 +369,10 @@ class Jupiter:
     def find_position(self,change_output,relation_output):
 	""" Calculates the current position of the Crtcs/Outputs relative to each other"""     
         conn_op=None
+        if change_output== None:
+          return 5
+        if relation_outpit == None:
+          return 6
         num=0
         for op in self.outputs:
             if op.is_definetely_connected():
@@ -570,11 +581,13 @@ class JupiterIndicator:
             self.ind = appindicator.Indicator ("jupiter-client", "indicator-messages", appindicator.CATEGORY_APPLICATION_STATUS)
             self.ind.set_status (appindicator.STATUS_ACTIVE)
             self.ind.set_attention_icon ("indicator-messages-new")
-            self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
-            self.ind.set_icon('xfce4-splash')
+            #self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
+            self.ind.set_icon_theme_path("/usr/share/pixmaps/")
+
+            self.ind.set_icon('bolt1')
         else:
             self.tray = gtk.StatusIcon()
-            self.tray.set_from_icon_name('xfce4-splash')
+            self.tray.set_from_icon_name('bolt1')
             self.tray.set_visible(True)
         
         self.jupiter = Jupiter(PATH, VENDOR_PATH, VAR_PATH)
@@ -765,6 +778,17 @@ class JupiterIndicator:
 
     def update_data(self,relation=None):
 	"""get new data from xrandr library (case sth. changed during usage)"""
+        #temporary fix for orientation issue
+        first=True
+        rot1=None
+        rot2=None
+        for op in self.jupiter.outputs:
+            if op.is_active() and op.is_definetely_connected():
+                if first == True:
+                    rot1=op._rotation
+                    first=False
+                else:
+                    rot2=op._rotation
         self.jupiter.screen= xrand.get_screen_old_display(self.jupiter.dpy)
         self.jupiter.monitors=self.jupiter.screen.crtcs
         self.jupiter.outputs= self.jupiter.screen.get_outputs()
@@ -772,13 +796,23 @@ class JupiterIndicator:
         secondary=None
         self.jupiter.connected_ops=0
         self.jupiter.active_ops=0
+        first=True
         for op in self.jupiter.outputs:
+            if op.is_definetely_connected() and op.is_active():
+                if first == True:
+                    if rot1 != None:
+                        op._rotation=rot1
+                    first=False
+                else:
+                    if rot2 != None:
+                        op._rotation=rot2
             if op.is_definetely_connected():
                 self.jupiter.connected_ops+=1
             if op.is_active():
                 self.jupiter.active_ops+=1
             self.jupiter.features.get(op.name)['output']=op
-            rotation=op.get_crtcs()[0]._info.contents.rotation
+            #rotation=op.get_crtcs()[0]._info.contents.rotation
+            rotation = op._rotation
             if rotation >8 or rotation <1:
 		# bit comparison of rotation is necessary if it is not in wanted area
                 rotation=rotation & 0xf
@@ -796,18 +830,18 @@ class JupiterIndicator:
 	"""Updates the app-icon to indicate whether or not powersave mode is on or off"""                           
         m = self.jupiter.get_current_cpu_mode()      
                                                      
-        if m == 'powersave':                       
+        if m == True:                       
             if loaded_indicator:                     
-                self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
-                self.ind.set_icon('preferences-desktop-screensaver')           
+                self.ind.set_icon_theme_path("/usr/share/pixmaps/")
+                self.ind.set_icon('bolt4')           
             else:                                    
-                self.tray.set_from_icon_name("preferences-desktop-screensaver")
+                self.tray.set_from_icon_name("bolt4")
         else:                                        
             if loaded_indicator:                     
-                self.ind.set_icon_theme_path('/usr/share/icons/elementary-xfce/apps/16/')
-                self.ind.set_icon('xfce4-splash')
+                self.ind.set_icon_theme_path('/usr/share/pixmaps/')
+                self.ind.set_icon('bolt1')
             else:                                    
-                self.tray.set_from_icon_name('xfce4-splash')
+                self.tray.set_from_icon_name('bolt1')
     
     def right_click_event(self, icon, button, time):
         self.menu.popup(None, None, gtk.status_icon_position_menu, button, time, self.tray)
@@ -1039,16 +1073,16 @@ class JupiterIndicator:
                     self.jupiter.powersave=powersave
                     if powersave == False:
                         if loaded_indicator:
-                            self.ind.set_icon_theme_path('/usr/share/icons/elementary-xfce/apps/16/')
-                            self.ind.set_icon('xfce4-splash')
+                            self.ind.set_icon_theme_path('/usr/share/pixmaps/')
+                            self.ind.set_icon('bolt1')
                         else:
-                            self.tray.set_from_icon_name('xfce4-splash')
+                            self.tray.set_from_icon_name('bolt1')
                     elif powersave == True:
                         if loaded_indicator:
-                            self.ind.set_icon_theme_path("/usr/share/icons/elementary-xfce/apps/16/")
-                            self.ind.set_icon('preferences-desktop-screensaver')
+                            self.ind.set_icon_theme_path("/usr/share/pixmaps/")
+                            self.ind.set_icon('bolt4')
                         else:
-                            self.tray.set_from_icon_name("preference-desktop-screensaver")
+                            self.tray.set_from_icon_name("bolt4")
     
     def switch_device(self, widget, data=None):
         if data != None:

@@ -46,6 +46,7 @@ case "$1" in
       fi
 
       if [ -d "/var/jupiter" ]; then
+        touch /var/jupiter/udev_drm
        	chown -R root:jupiter /var/jupiter
         chmod -R 775 /var/jupiter
       	chmod  ug+s /var/jupiter
