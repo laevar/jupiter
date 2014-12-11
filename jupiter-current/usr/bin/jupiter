@@ -371,7 +371,7 @@ class Jupiter:
         conn_op=None
         if change_output== None:
           return 5
-        if relation_outpit == None:
+        if relation_output == None:
           return 6
         num=0
         for op in self.outputs:
