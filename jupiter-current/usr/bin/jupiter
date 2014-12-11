@@ -632,12 +632,8 @@ class JupiterIndicator:
                    connected_ops+=1
                if op.is_active():
                   active_ops+=1
-            print active_ops
-            print connected_ops
             self.jupiter.connected_ops=connected_ops
             self.jupiter.active_ops=active_ops
-            print 'connected_ops ' + str(self.jupiter.connected_ops)
-            print 'active ops ' + str(self.jupiter.active_ops)
             self.jupiter.screen= screen
             self.jupiter.monitors= monitors
             self.jupiter.outputs= outputs
@@ -780,36 +776,38 @@ class JupiterIndicator:
     def update_screen_menus(self):
 	""" Updates screen menu in cased data is updated (external things happend)"""
         # screen menuself.menu.remove(self.menu.get_children()[6])
-        self.menu.remove(self.menu.get_children()[6])
+        for ch in self.menu.get_children():
+          print ch
+        self.menu.remove(self.menu.get_children()[4])
         resolutions = gtk.Menu()
         res_item = gtk.MenuItem('Screen Resolutions')
         res_item.set_submenu(resolutions)
         res_item.show()
-        self.menu.insert(res_item,6)
+        self.menu.insert(res_item,4)
         self.update_screen_resolutions(resolutions)
         # rotate menu
-        self.menu.remove(self.menu.get_children()[7])
+        self.menu.remove(self.menu.get_children()[5])
         orientations = gtk.Menu()
         ort_item = gtk.MenuItem('Screen Orientation')
         ort_item.set_submenu(orientations)
         ort_item.show()
-        self.menu.insert(ort_item,7)
+        self.menu.insert(ort_item,5)
         self.update_screen_orientations(orientations)
         # primary menu
-        self.menu.remove(self.menu.get_children()[8])
+        self.menu.remove(self.menu.get_children()[6])
         primary = gtk.Menu()
         prim_item = gtk.MenuItem('Primary Display')
         prim_item.set_submenu(primary)
         prim_item.show()
-        self.menu.insert(prim_item,8)
+        self.menu.insert(prim_item,6)
         self.update_primary(primary)
         # video menu
-        self.menu.remove(self.menu.get_children()[9])
+        self.menu.remove(self.menu.get_children()[7])
         displays = gtk.Menu()
         disp_item = gtk.MenuItem('Video Displays')
         disp_item.set_submenu(displays)
         disp_item.show()
-        self.menu.insert(disp_item,9)
+        self.menu.insert(disp_item,7)
         threading.Thread(target=self.update_video_displays, args=[displays]).start()
 	# Necessary because else the menu cannot build up completely. UGLY AS SHIT THOUGH
         time.sleep(1)
@@ -1250,7 +1248,7 @@ class JupiterAboutDialog(gtk.AboutDialog):
         
         logo = gtk.icon_theme_get_default().load_icon('jupiter', 64, 0)
         self.set_logo(logo)
-        self.set_website('http://www.jupiterapplet.org')
+        self.set_website('https://github.com/laevar/jupiter')
         self.set_website_label('Homepage')
     
 def main():
